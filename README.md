@@ -4,13 +4,13 @@ A small web page that splits the occupied beds in a unit evenly among the staff 
 
 ## How it works
 
-1. **Rooms and beds.** The rooms come from [`rooms.json`](rooms.json) (see below). The first screen shows every room in one column with a block for each bed: tap a bed to fill it orange (occupied) or clear it (empty), then tap **Divide beds**.
-2. **Staff.** On the second screen, set how many people are working. Names are optional.
-3. **Assignments.** Rooms are divided into one block per person:
+1. **Rooms and beds.** The rooms come from [`rooms.json`](rooms.json) (see below). The page shows every room in one column with a block for each bed. Every bed starts out occupied (orange); tap the empty ones to clear them.
+2. **Workers.** Below the rooms, enter how many people are working. Names are optional (under **More options**).
+3. **Assignments.** The page lists each worker's bed range (for example *Beds 1A – 8B*) with their patient count. Rooms are divided into one block per person:
    - **A room is never split between people**, and each person gets a **contiguous run of rooms**, so assignments stay geographically together.
    - Among all such splits, the calculator picks the one with the **most even patient counts**. Because rooms can't be split, counts may differ by a couple of patients.
    - Each person's **open beds** are listed too, so everyone knows which admissions are theirs.
-   - Tick **Allow a room's beds to be split between people** to divide bed by bed instead. Counts then differ by at most one, but roommates can end up with different staff.
+   - Under **More options**, tick **Allow a room's beds to be split between workers** to divide bed by bed instead. Counts then differ by at most one, but roommates can end up with different staff.
 
 Everything is saved in the browser's local storage on that device only. Nothing is sent anywhere.
 
