@@ -150,13 +150,14 @@ textarea, input[type=text], input[type=number] {
 .sync.error { color: var(--error); }
 .room-line { display: flex; align-items: center; gap: 8px; }
 .room-line .room { flex: 1; min-width: 0; }
-/* + and − are the same size as a bed (--bed-size is measured in JS). */
+/* + and − are squares 75% as wide as a bed (--tool-size is measured in JS). */
 .beds-row .bed.add-bed, .remove-bed {
-  flex: 0 0 var(--bed-size, 53px); width: var(--bed-size, 53px); height: var(--bed-height, 52px); min-height: 0;
+  flex: 0 0 var(--tool-size, 40px); width: var(--tool-size, 40px); height: var(--tool-size, 40px); min-height: 0;
   align-self: center; padding: 0; border: 2px solid var(--tool); border-radius: 8px;
   background: transparent; color: var(--tool); font-size: 1.4rem; font-weight: 500; line-height: 1;
 }
 .remove-bed:disabled { opacity: 0.35; cursor: default; }
+.beds-row .bed.add-bed { margin-left: calc((var(--bed-size, 53px) - var(--tool-size, 40px)) / 2); }
 #edit-toggle[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .layout-note.error { color: var(--error); border: 1px solid var(--error); }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 0.9rem; color: var(--muted); margin: 8px 0; }
@@ -185,7 +186,7 @@ textarea, input[type=text], input[type=number] {
       </div>
       <p class="layout-note" id="layout-note" hidden></p>
       <p class="sync" id="sync-status" hidden></p>
-      <p class="hint" id="edit-hint" hidden>Tap <strong>+</strong> in a room to add a bed (up to 4), or <strong>−</strong> beside a room to remove its last bed. Changes save for everyone.</p>
+      <p class="hint" id="edit-hint" hidden>Tap <strong>+</strong> in a room to add a bed (up to 3), or <strong>−</strong> beside a room to remove its last bed. Changes save for everyone.</p>
       <p class="hint">Every bed starts as occupied. Tap the empty ones to clear them.</p>
       <p class="legend"><span class="key occ"></span> Occupied <span class="key"></span> Empty <span class="census" id="census"></span></p>
       <div class="row tight">
@@ -368,7 +369,7 @@ textarea, input[type=text], input[type=number] {
   // device only, using rooms.json for the rooms.
   const WORKER_URL = '';
   const CODE_KEY = 'bed-divider:passcode';
-  const MAX_BEDS = 4;
+  const MAX_BEDS = 3;
   // Used only if rooms.json can't be loaded (for example when this page is
   // opened straight from a file instead of from the website).
   const FALLBACK_LAYOUT = { rooms: [{ room: "1", beds: ["A", "B", "C"] }, { room: "2", beds: ["A", "B", "C"] }, { room: "3", beds: ["A", "B"] }, { room: "4", beds: ["A", "B"] }, { room: "5", beds: ["A", "B", "C"] }, { room: "6", beds: ["A", "B"] }, { room: "7", beds: ["A", "B"] }, { room: "8", beds: ["A", "B", "C"] }, { room: "9", beds: ["A", "B"] }, { room: "10", beds: ["A", "B", "C"] }, { room: "11", beds: ["A", "B"] }, { room: "12", beds: ["A", "B", "C"] }, { room: "14", beds: ["A", "B", "C"] }, { room: "15", beds: ["A", "B"] }, { room: "16", beds: ["A", "B"] }, { room: "17", beds: ["A", "B"] }, { room: "18", beds: ["A", "B", "C"] }, { room: "19", beds: ["A", "B", "C"] }, { room: "20", beds: ["A", "B", "C"] }, { room: "21", beds: ["A", "B", "C"] }, { room: "22", beds: ["A", "B"] }, { room: "23", beds: ["A", "B"] }, { room: "24", beds: ["A", "B"] }, { room: "25", beds: ["A", "B"] }, { room: "26", beds: ["A", "B", "C"] }, { room: "27", beds: ["A", "B", "C"] }, { room: "28", beds: ["A", "B", "C"] }, { room: "29", beds: ["A", "B", "C"] }, { room: "30", beds: ["A", "B", "C"] }, { room: "31", beds: ["A", "B", "C"] }, { room: "32", beds: ["A", "B", "C"] }, { room: "33", beds: ["A", "B"] }, { room: "34", beds: ["A", "B", "C"] }, { room: "35", beds: ["A", "B"] }, { room: "36", beds: ["A", "B", "C"] }, { room: "37", beds: ["A", "B", "C"] }, { room: "38", beds: ["A", "B", "C"] }] };
@@ -664,13 +665,13 @@ textarea, input[type=text], input[type=number] {
     if (pending.length) flush();
   }
 
-  // Size the + and − buttons to match a bed.
+  // Size the + and − squares to 75% of a bed's width.
   function sizeTools() {
     const bed = grid.querySelector('.beds-row .bed:not(.add-bed)');
     if (!bed) return;
     const w = bed.getBoundingClientRect().width;
     grid.style.setProperty('--bed-size', `${w}px`);
-    grid.style.setProperty('--bed-height', `${bed.getBoundingClientRect().height}px`);
+    grid.style.setProperty('--tool-size', `${Math.round(w * 0.75)}px`);
   }
   window.addEventListener('resize', () => { if (editing) sizeTools(); });
 

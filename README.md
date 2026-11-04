@@ -30,7 +30,7 @@ Edit `rooms.json` on GitHub (open it, click the pencil, commit). The calculator 
 
 ## Shared bed list (optional)
 
-With the small Cloudflare Worker in [`worker/`](worker/README.md) set up, the room layout and the occupied beds are shared by everyone who opens the page. Staff with the passcode can tap beds and use **Edit beds** to add or remove beds (up to 4 per room), and every change saves for everyone. Without it, the page works as before: rooms come from `rooms.json`, and taps stay on that device.
+With the small Cloudflare Worker in [`worker/`](worker/README.md) set up, the room layout and the occupied beds are shared by everyone who opens the page. Staff with the passcode can tap beds and use **Edit beds** to add or remove beds (up to 3 per room), and every change saves for everyone. Without it, the page works as before: rooms come from `rooms.json`, and taps stay on that device.
 
 ## Run locally
 

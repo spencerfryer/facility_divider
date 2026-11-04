@@ -31,7 +31,7 @@ To check it, open `https://<your worker>/state`. Before the first change it show
 ## Using it
 
 - Tap beds as usual. Each change saves for everyone, and other open copies of the page pick it up within about 20 seconds.
-- **Edit beds** (top right of the Rooms panel) shows a **+** in the next empty bed slot of each room to add a bed, and a **−** outside each room to remove its last bed. Each room can have 1 to 4 beds. New beds start out occupied.
+- **Edit beds** (top right of the Rooms panel) shows a **+** in the next empty bed slot of each room to add a bed, and a **−** outside each room to remove its last bed. Each room can have 1 to 3 beds. New beds start out occupied.
 - The first change on a phone or computer asks for the passcode once. That device then remembers it. A wrong code is forgotten, and the page goes back to the last saved version.
 
 ## Starting over
