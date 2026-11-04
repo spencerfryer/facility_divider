@@ -254,14 +254,14 @@ textarea, input[type=text], input[type=number] {
             <input id="staff-count" type="number" min="1" max="50" value="4" inputmode="numeric">
             <button type="button" id="staff-plus" aria-label="One more">+</button>
           </div>
-          <div class="actions">
-            <button type="button" class="ghost" id="print">Print</button>
-            <button type="button" id="finalize">Finalize</button>
-          </div>
         </div>
-        <p class="sync" id="finalize-status" hidden></p>
         <p class="hint">Click on worker name to assign or change worker</p>
         <ol id="results" class="assign-list" aria-live="polite"></ol>
+        <div class="row" style="margin-top: 12px; margin-bottom: 0; justify-content: flex-end;">
+          <button type="button" class="ghost" id="print">Print</button>
+          <button type="button" id="finalize">Finalize</button>
+        </div>
+        <p class="sync" id="finalize-status" style="margin-top: 8px; margin-bottom: 0;" hidden></p>
       </div>
     </section>
   </main>
