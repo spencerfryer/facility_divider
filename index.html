@@ -24,6 +24,7 @@
   --on-orange: #241300;
   --bed-line: #4a5360;
   --error: #ff7b72;
+  --tool: #7999d2; /* accent blue at half saturation, for the + and − buttons */
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -149,14 +150,13 @@ textarea, input[type=text], input[type=number] {
 .sync.error { color: var(--error); }
 .room-line { display: flex; align-items: center; gap: 8px; }
 .room-line .room { flex: 1; min-width: 0; }
-/* + and − are squares 75% as wide as a bed (--tool-size is measured in JS). */
+/* + and − are the same size as a bed (--bed-size is measured in JS). */
 .beds-row .bed.add-bed, .remove-bed {
-  flex: 0 0 var(--tool-size, 40px); width: var(--tool-size, 40px); height: var(--tool-size, 40px); min-height: 0;
-  align-self: center; padding: 0; border: 2px solid var(--accent); border-radius: 8px;
-  background: transparent; color: var(--accent); font-size: 1.4rem; font-weight: 500; line-height: 1;
+  flex: 0 0 var(--bed-size, 53px); width: var(--bed-size, 53px); height: var(--bed-height, 52px); min-height: 0;
+  align-self: center; padding: 0; border: 2px solid var(--tool); border-radius: 8px;
+  background: transparent; color: var(--tool); font-size: 1.4rem; font-weight: 500; line-height: 1;
 }
 .remove-bed:disabled { opacity: 0.35; cursor: default; }
-.beds-row .bed.add-bed { margin-left: calc((var(--bed-size, 53px) - var(--tool-size, 40px)) / 2); }
 #edit-toggle[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .layout-note.error { color: var(--error); border: 1px solid var(--error); }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 0.9rem; color: var(--muted); margin: 8px 0; }
@@ -664,13 +664,13 @@ textarea, input[type=text], input[type=number] {
     if (pending.length) flush();
   }
 
-  // Size the + and − squares to 75% of a bed's width.
+  // Size the + and − buttons to match a bed.
   function sizeTools() {
     const bed = grid.querySelector('.beds-row .bed:not(.add-bed)');
     if (!bed) return;
     const w = bed.getBoundingClientRect().width;
     grid.style.setProperty('--bed-size', `${w}px`);
-    grid.style.setProperty('--tool-size', `${Math.round(w * 0.75)}px`);
+    grid.style.setProperty('--bed-height', `${bed.getBoundingClientRect().height}px`);
   }
   window.addEventListener('resize', () => { if (editing) sizeTools(); });
 
