@@ -28,12 +28,16 @@ Edit `rooms.json` on GitHub (open it, click the pencil, commit). The calculator 
 - If the file has a mistake, the page shows a red note saying what's wrong and uses its built-in copy of the room list until it's fixed.
 - GitHub Pages can take a few minutes to pick up a change.
 
+## Shared bed list (optional)
+
+With the small Cloudflare Worker in [`worker/`](worker/README.md) set up, the room layout and the occupied beds are shared by everyone who opens the page. Staff with the passcode can tap beds and use **Edit beds** to add or remove beds (up to 4 per room), and every change saves for everyone. Without it, the page works as before: rooms come from `rooms.json`, and taps stay on that device.
+
 ## Run locally
 
 Opening `index.html` straight from disk works, but browsers block it from reading `rooms.json` that way, so it uses the built-in room list. To use `rooms.json` locally, run `python3 -m http.server` in this folder and open http://localhost:8000. To run the tests of the splitting logic (Node 18+):
 
 ```sh
-node --test tests/*.test.js
+node --test tests/*.test.js tests/*.test.mjs
 ```
 
 ## Publish on GitHub Pages
@@ -47,4 +51,5 @@ node --test tests/*.test.js
 
 - `index.html` – the whole app
 - `rooms.json` – the room and bed list
+- `worker/` – the optional Cloudflare Worker for a shared bed list
 - `tests/divide.test.js` – tests for the splitting logic, read straight out of `index.html`
