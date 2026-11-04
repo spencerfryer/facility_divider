@@ -103,7 +103,6 @@ textarea, input[type=text], input[type=number] {
 .stepper button:last-child { border-radius: 0 8px 8px 0; }
 .stepper button { min-width: 44px; padding: 0; font-size: 1.2rem; }
 
-.swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
 .worker-wrap { position: relative; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .worker-pick {
   display: inline-flex; align-items: center; gap: 6px;
@@ -551,10 +550,7 @@ textarea, input[type=text], input[type=number] {
       { id: "oncall-yeshimebet", name: "Yeshimebet" }, { id: "oncall-zailyah", name: "Zailyah" },
     ],
   };
-  // Distinct colors that keep white text readable.
-  const COLORS = ['#1f6feb', '#d1453b', '#1a7f37', '#8250df', '#bc4c00', '#0a7d8c', '#bf3989', '#6e7781',
-                  '#9a6700', '#0550ae', '#a40e26', '#116329', '#6639ba', '#953800', '#1b7c83', '#99286e'];
-  const color = (i) => COLORS[i % COLORS.length];
+  const SHIFT_COLORS = { AM: '#f0c419', PM: '#f5891f', NOC: '#4c8dff' };
 
   // Beds default to occupied; we remember which ones were tapped empty.
   const SHIFTS = ['AM', 'PM', 'NOC'];
@@ -803,9 +799,10 @@ textarea, input[type=text], input[type=number] {
     const activeFlags = extras().slice(0, workers());
     const shiftOrder = [tab(), ...SHIFTS.filter((s) => s !== tab()), 'On Call'];
 
+    const shiftColor = SHIFT_COLORS[tab()] || SHIFT_COLORS.AM;
     groups.forEach((g, i) => {
       const li = el('li');
-      li.style.borderLeftColor = color(i);
+      li.style.borderLeftColor = shiftColor;
       const who = el('div', 'who');
       const wrap = el('div', 'worker-wrap');
       const pick = el('button', 'worker-pick');
@@ -813,9 +810,7 @@ textarea, input[type=text], input[type=number] {
       const isOpen = openMenuSlot === i;
       pick.setAttribute('aria-haspopup', 'listbox');
       pick.setAttribute('aria-expanded', String(isOpen));
-      const sw = el('span', 'swatch');
-      sw.style.background = color(i);
-      pick.append(sw, el('span', 'worker-label', staffName(i)), el('span', 'caret', '▾'));
+      pick.append(el('span', 'worker-label', staffName(i)), el('span', 'caret', '▾'));
       pick.addEventListener('click', (e) => {
         e.stopPropagation();
         openMenuSlot = openMenuSlot === i ? -1 : i;
