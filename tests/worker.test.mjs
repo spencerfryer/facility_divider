@@ -100,3 +100,11 @@ test('older saves without shifts still load', () => {
   assert.deepStrictEqual(Object.keys(s.shifts), ['AM', 'PM', 'NOC']);
   assert.strictEqual(s.version, 3);
 });
+
+test('finalize flags who got an extra patient, per shift', () => {
+  let s = applyOps(seed(), [{ op: 'finalize', shift: 'AM', counts: [4, 3, 3] }]);
+  assert.deepStrictEqual(s.shifts.AM.extras, [true, false, false]);
+  assert.deepStrictEqual(s.shifts.PM.extras, []);
+  s = applyOps(s, [{ op: 'finalize', shift: 'AM', counts: [3, 4, 4] }]);
+  assert.deepStrictEqual(s.shifts.AM.extras, [false, false, false]); // everyone had one: new round
+});

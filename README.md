@@ -10,6 +10,7 @@ A small web page that splits the occupied beds in a unit evenly among the staff 
    - A room can be shared: if one worker's range ends on 29B, the next starts on 29C.
    - Each worker's line shows their range (for example *Beds 1A – 9A*) and any empty beds inside it to skip.
    - **Print** prints that tab's list. **Finalize** records how many patients each worker got; each tab keeps its last 7 finalized records, newest first.
+   - **Fair extras:** when the beds don't divide evenly, some workers get one extra patient. Finalize marks those workers ("had extra"), and the next extras go to the others first, until everyone in that tab has had one and the round starts over. Workers are counted by position (Worker 1, 2, 3…); if the number of workers changes, new positions start unmarked.
 
 Everything is saved in the browser's local storage on that device only. Nothing is sent anywhere.
 

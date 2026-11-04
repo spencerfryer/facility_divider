@@ -11,15 +11,17 @@
  *       ...
  *     ],
  *     "shifts": {
- *       "AM":  { "workers": 4, "history": [
+ *       "AM":  { "workers": 4, "extras": [true, false, false, false], "history": [
  *                  { "at": "2026-11-04T07:05:00Z", "counts": [13, 13, 12], "ranges": ["1A – 9A", ...] } ] },
- *       "PM":  { "workers": 3, "history": [] },
- *       "NOC": { "workers": 2, "history": [] }
+ *       "PM":  { "workers": 3, "extras": [], "history": [] },
+ *       "NOC": { "workers": 2, "extras": [], "history": [] }
  *     }
  *   }
  * So it holds the rooms, how many beds each room has, whether each bed is
- * occupied, and for each shift the number of workers plus the last
- * HISTORY_LENGTH finalized assignments (newest first).
+ * occupied, and for each shift the number of workers, the last
+ * HISTORY_LENGTH finalized assignments (newest first), and "extras": which
+ * worker positions already got an extra patient this round, so the page can
+ * rotate the extras fairly.
  *
  * Routes:
  *   GET  /state   anyone: returns the saved state (404 if nothing saved yet)
@@ -73,6 +75,22 @@ export function validateState(s) {
   return s;
 }
 
+/**
+ * Same rule as nextFlags in index.html: after a finalize, workers above the
+ * fewest patients are flagged; once all are flagged a new round starts,
+ * keeping only those who got a second extra in this finalize.
+ */
+export function nextFlags(flags, counts) {
+  const n = counts.length;
+  let f = Array.from({ length: n }, (_, i) => !!(flags && flags[i]));
+  if (f.every(Boolean)) f = f.map(() => false);
+  const min = Math.min(...counts);
+  const got = counts.map((c) => c > min);
+  const after = f.map((x, i) => x || got[i]);
+  if (n && after.every(Boolean)) return f.map((x, i) => x && got[i]);
+  return after;
+}
+
 const clampWorkers = (n) => Math.max(1, Math.min(MAX_WORKERS, Math.floor(Number(n)) || 1));
 
 /** Keep only the fields we store, filling in shift defaults for older saves. */
@@ -82,6 +100,7 @@ export function cleanState(s) {
     const sh = (s.shifts && s.shifts[name]) || {};
     shifts[name] = {
       workers: clampWorkers(sh.workers ?? 4),
+      extras: Array.isArray(sh.extras) ? sh.extras.slice(0, MAX_WORKERS).map(Boolean) : [],
       history: Array.isArray(sh.history) ? sh.history.slice(0, HISTORY_LENGTH).map((h) => ({
         at: String(h.at || ''),
         counts: Array.isArray(h.counts) ? h.counts.map((c) => Math.max(0, Math.floor(Number(c)) || 0)) : [],
@@ -105,7 +124,8 @@ export function cleanState(s) {
  *   { op: "setAll", occupied: true }   marks every bed occupied (or empty)
  *   { op: "setWorkers", shift: "AM", workers: 4 }
  *   { op: "finalize", shift: "AM", counts: [13, 13, 12], ranges: ["1A – 9A", ...] }
- *        records the patients per worker; keeps the newest HISTORY_LENGTH
+ *        records the patients per worker; keeps the newest HISTORY_LENGTH,
+ *        and flags the workers who got an extra patient (see nextFlags)
  */
 export function applyOps(state, ops) {
   if (!Array.isArray(ops) || ops.length > 200) throw new Error('"ops" must be a list of up to 200 changes');
@@ -155,6 +175,7 @@ export function applyOps(state, ops) {
         const h = s.shifts[o.shift].history;
         h.unshift({ at: new Date().toISOString(), counts: o.counts, ranges });
         h.length = Math.min(h.length, HISTORY_LENGTH);
+        s.shifts[o.shift].extras = nextFlags(s.shifts[o.shift].extras, o.counts);
         break;
       }
       default:

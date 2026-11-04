@@ -104,3 +104,37 @@ test('rooms.json is valid: 37 rooms, no room 13', () => {
   assert.strictEqual(rooms.length, 37);
   assert.ok(!rooms.some((r) => r.name === '13'));
 });
+
+const { pickExtras, nextFlags } = Object.fromEntries(
+  Object.entries(sandbox.self.Divider).map(([k, fn]) => [k, wrap(fn)]));
+
+test('extras skip workers who already had one this round', () => {
+  assert.deepStrictEqual(evenSizes(10, 3, [true, false, false]), [3, 4, 3]);
+  assert.deepStrictEqual(evenSizes(11, 3, [true, false, false]), [3, 4, 4]);
+  // More extras than unflagged workers: the rest go to flagged workers in order.
+  assert.deepStrictEqual(evenSizes(11, 3, [true, true, false]), [4, 3, 4]);
+  // Everyone flagged counts as a fresh round.
+  assert.deepStrictEqual(evenSizes(10, 3, [true, true, true]), [4, 3, 3]);
+  // Flags for a different worker count are cut or padded.
+  assert.deepStrictEqual(pickExtras(1, 4, [true, true]), [false, false, true, false]);
+});
+
+test('extra patients rotate through every worker over several finalizes', () => {
+  let flags = [];
+  const got = [0, 0, 0, 0];
+  for (let i = 0; i < 4; i++) {
+    const sizes = evenSizes(13, 4, flags);          // one extra each time
+    sizes.forEach((s, w) => { if (s === 4) got[w]++; });
+    flags = nextFlags(flags, sizes);
+  }
+  assert.deepStrictEqual(got, [1, 1, 1, 1]);
+});
+
+test('nextFlags flags workers above the minimum and resets a full round', () => {
+  assert.deepStrictEqual(nextFlags([], [4, 3, 3]), [true, false, false]);
+  assert.deepStrictEqual(nextFlags([true, false, false], [3, 4, 4]), [false, false, false]);
+  // The overflow extra (worker 1 had one already) carries into the next round.
+  assert.deepStrictEqual(nextFlags([true, true, false], [4, 3, 4]), [true, false, false]);
+  // Even split: nothing changes.
+  assert.deepStrictEqual(nextFlags([true, false], [3, 3]), [true, false]);
+});

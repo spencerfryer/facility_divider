@@ -179,6 +179,7 @@ textarea, input[type=text], input[type=number] {
 .history-list .when { font-weight: 650; }
 .history-list .counts { color: var(--muted); font-variant-numeric: tabular-nums; }
 .print-only { display: none; }
+.tag { font-size: 0.75rem; font-weight: 500; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; white-space: nowrap; }
 
 @media print {
   body { background: #fff; color: #000; }
@@ -186,6 +187,7 @@ textarea, input[type=text], input[type=number] {
   .panel { border: none; padding: 0; margin: 8px 0; }
   .panel > h2 { display: none; }
   .print-only { display: block; margin: 0 0 8px; }
+  .tag { display: none; }
   .bed, .card, .assign-list li { -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; }
 }
   </style>
@@ -264,25 +266,63 @@ textarea, input[type=text], input[type=number] {
  * person also knows which open beds (admissions) are "theirs".
  */
 (function (root) {
+  /** `flags` cut or padded (with false) to `n` workers. */
+  function fitFlags(flags, n) {
+    const f = [];
+    for (let i = 0; i < n; i++) f.push(!!(flags && flags[i]));
+    return f;
+  }
+
+  /**
+   * Which of `n` workers get one of `extra` extra patients. Workers flagged
+   * as having already had an extra this round are skipped until everyone has
+   * had one; if there are more extras than unflagged workers, the rest go to
+   * flagged workers in order. With no flags, the first workers get them.
+   */
+  function pickExtras(extra, n, flags) {
+    let f = fitFlags(flags, n);
+    if (f.every(Boolean)) f = f.map(() => false);
+    const fresh = [], had = [];
+    f.forEach((x, i) => (x ? had : fresh).push(i));
+    const chosen = new Set(fresh.concat(had).slice(0, extra));
+    return f.map((_, i) => chosen.has(i));
+  }
+
+  /**
+   * Flags after a finalize: workers who got more patients than the fewest
+   * are flagged. Once every worker is flagged the round starts over, keeping
+   * only the workers who got a second extra in this same finalize.
+   */
+  function nextFlags(flags, counts) {
+    const n = counts.length;
+    let f = fitFlags(flags, n);
+    if (f.every(Boolean)) f = f.map(() => false);
+    const min = Math.min(...counts);
+    const got = counts.map((c) => c > min);
+    const after = f.map((x, i) => x || got[i]);
+    if (n && after.every(Boolean)) return f.map((x, i) => x && got[i]);
+    return after;
+  }
+
   /**
    * Sizes of `groups` groups covering `total` items as evenly as possible.
-   * Larger groups come first, e.g. evenSizes(10, 3) -> [4, 3, 3].
+   * Without `flags` larger groups come first, e.g. evenSizes(10, 3) -> [4, 3, 3];
+   * with flags, the extras go to workers who haven't had one this round.
    */
-  function evenSizes(total, groups) {
+  function evenSizes(total, groups, flags) {
     if (groups <= 0) return [];
     const base = Math.floor(total / groups);
-    const extra = total % groups;
-    const sizes = [];
-    for (let i = 0; i < groups; i++) sizes.push(base + (i < extra ? 1 : 0));
-    return sizes;
+    const getsExtra = pickExtras(total % groups, groups, flags);
+    return getsExtra.map((x) => base + (x ? 1 : 0));
   }
 
   /**
    * @param {{id: string, occupied: boolean}[]} beds  beds in layout order
    * @param {number} staffCount
+   * @param {boolean[]} [flags]  workers who already had an extra patient this round
    * @returns {{groups: {occupied: string[], empty: string[]}[], unassignedEmpty: string[]}}
    */
-  function divideBeds(beds, staffCount) {
+  function divideBeds(beds, staffCount, flags) {
     const n = Math.max(0, Math.floor(Number(staffCount) || 0));
     const groups = [];
     for (let i = 0; i < n; i++) groups.push({ occupied: [], empty: [] });
@@ -292,7 +332,7 @@ textarea, input[type=text], input[type=number] {
 
     const occupiedIdx = [];
     beds.forEach((b, i) => { if (b.occupied) occupiedIdx.push(i); });
-    const sizes = evenSizes(occupiedIdx.length, n);
+    const sizes = evenSizes(occupiedIdx.length, n, flags);
 
     // owner[i] = group index owning bed i (occupied beds only for now)
     const owner = new Array(beds.length).fill(-1);
@@ -383,7 +423,7 @@ textarea, input[type=text], input[type=number] {
     });
   }
 
-  const api = { evenSizes, divideBeds, parseBedList, parseLayout };
+  const api = { evenSizes, pickExtras, nextFlags, divideBeds, parseBedList, parseLayout };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Divider = api;
 })(typeof self !== 'undefined' ? self : this);
@@ -391,7 +431,7 @@ textarea, input[type=text], input[type=number] {
   <script>
 (function () {
   const { divideBeds } = window.Divider;
-  const { parseLayout } = window.Divider;
+  const { parseLayout, nextFlags } = window.Divider;
   const STORE = 'bed-divider:v6';
   // Address of the Cloudflare Worker that stores the shared layout and bed
   // states (see worker/README.md). Leave empty to keep everything on this
@@ -410,7 +450,7 @@ textarea, input[type=text], input[type=number] {
   // Beds default to occupied; we remember which ones were tapped empty.
   const SHIFTS = ['AM', 'PM', 'NOC'];
   const HISTORY_LENGTH = 7;
-  const newShifts = () => Object.fromEntries(SHIFTS.map((n) => [n, { workers: 4, names: [], history: [] }]));
+  const newShifts = () => Object.fromEntries(SHIFTS.map((n) => [n, { workers: 4, names: [], history: [], extras: [] }]));
   const defaults = () => ({ empty: {}, tab: 'AM', shifts: newShifts() });
 
   let state = load();
@@ -455,6 +495,8 @@ textarea, input[type=text], input[type=number] {
   const sharedShift = () => (shared.on && shared.shifts ? shared.shifts[tab()] : null);
   const workers = () => (sharedShift() || local()).workers;
   const history = () => (sharedShift() || local()).history;
+  // Worker positions that already had an extra patient this round.
+  const extras = () => (sharedShift() || local()).extras || [];
   const staffName = (i) => (local().names[i] || '').trim() || `Worker ${i + 1}`;
   let lastGroups = [];
   // Bed ids look like "12A"; the label is the part after the room name.
@@ -517,7 +559,7 @@ textarea, input[type=text], input[type=number] {
     const rooms = buildRooms();
     const allBeds = rooms.flatMap((r) => r.beds);
     // Split only the occupied beds, in order, regardless of room.
-    const { groups } = divideBeds(allBeds, workers());
+    const { groups } = divideBeds(allBeds, workers(), extras());
 
     // Room grid
     grid.innerHTML = '';
@@ -593,7 +635,13 @@ textarea, input[type=text], input[type=number] {
       const li = el('li');
       li.style.borderLeftColor = color(i);
       const who = el('div', 'who');
-      who.append(el('span', null, staffName(i)),
+      const name = el('span', null, staffName(i));
+      if (extras()[i] && !extras().slice(0, workers()).every(Boolean)) {
+        const tag = el('span', 'tag', 'had extra');
+        tag.title = 'Got an extra patient earlier this round, so the next extras go to others first.';
+        name.append(' ', tag);
+      }
+      who.append(name,
                  el('span', 'count', `${g.occupied.length} patient${g.occupied.length === 1 ? '' : 's'}`));
       li.append(who);
       const occ = g.occupied;
@@ -657,6 +705,7 @@ textarea, input[type=text], input[type=number] {
     const h = state.shifts[shift].history;
     h.unshift(entry);
     h.length = Math.min(h.length, HISTORY_LENGTH);
+    state.shifts[shift].extras = nextFlags(state.shifts[shift].extras, counts);
     setFinalizeStatus(`${shift} finalized at ${t} (saved on this device).`);
     update();
   }
@@ -715,7 +764,7 @@ textarea, input[type=text], input[type=number] {
   function currentState() {
     return {
       rooms: buildRooms().map((r) => ({ room: r.name, beds: r.beds.map((b) => ({ label: b.label, occupied: b.occupied })) })),
-      shifts: Object.fromEntries(SHIFTS.map((n) => [n, { workers: state.shifts[n].workers, history: state.shifts[n].history }])),
+      shifts: Object.fromEntries(SHIFTS.map((n) => [n, { workers: state.shifts[n].workers, history: state.shifts[n].history, extras: state.shifts[n].extras }])),
     };
   }
 
@@ -891,7 +940,7 @@ textarea, input[type=text], input[type=number] {
     const keep = state.shifts;
     state = defaults();
     // Worker counts and finalized history are kept; only names are cleared.
-    for (const n of SHIFTS) { state.shifts[n].workers = keep[n].workers; state.shifts[n].history = keep[n].history; }
+    for (const n of SHIFTS) Object.assign(state.shifts[n], { workers: keep[n].workers, history: keep[n].history, extras: keep[n].extras });
     if (shared.on) { shared.empty = {}; queue({ op: 'setAll', occupied: true }); }
     namesBox.innerHTML = '';
     update();
