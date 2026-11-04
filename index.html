@@ -1486,27 +1486,33 @@ textarea, input[type=text], input[type=number] {
     });
   });
   $('reset').addEventListener('click', () => {
-    if (!confirm('Mark every bed occupied again and reset the worker selections to default?')) return;
+    if (!confirm('Mark every bed occupied again and reset the worker selections and "had extra" status to default?')) return;
     const keep = state.shifts;
-    const keepWorkers = state.workers;
+    const flaggedIds = workerPool().filter((w) => w.extra).map((w) => w.id);
+    allWorkers = allWorkers.map((w) => ({ ...w, extra: false }));
     state = defaults();
-    state.workers = keepWorkers;
-    // Worker counts, finalizations, and worker extra status are kept.
+    state.workers = allWorkers.map((w) => ({ ...w, extra: false }));
+    // Worker counts and finalizations are kept; "had extra" is reset to nothing.
     for (const n of SHIFTS) {
       Object.assign(state.shifts[n], {
         workers: keep[n].workers,
-        extras: keep[n].extras,
+        extras: [],
         finalizations: keep[n].finalizations,
       });
       syncShiftIds(state.shifts[n], n);
     }
     if (shared.on) {
       shared.empty = {};
-      queue({ op: 'setAll', occupied: true });
+      shared.workers = state.workers.map((w) => ({ ...w }));
+      queue({ op: 'setAll', occupied: true, resetExtras: true });
+      if (flaggedIds.length) {
+        queue({ op: 'finalize', shift: tab(), counts: flaggedIds.map(() => 0), workerIds: flaggedIds, resetExtras: true });
+      }
       for (const n of SHIFTS) {
         if (shared.shifts && shared.shifts[n]) {
           shared.shifts[n].workers = state.shifts[n].workers;
           shared.shifts[n].ids = state.shifts[n].ids.slice();
+          shared.shifts[n].extras = [];
         }
         queue({ op: 'setWorkers', shift: n, workers: state.shifts[n].workers, ids: state.shifts[n].ids.slice() });
       }

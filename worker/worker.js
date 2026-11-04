@@ -206,6 +206,10 @@ export function applyOps(state, ops) {
       }
       case 'setAll':
         s.rooms.forEach((r) => r.beds.forEach((b) => { b.occupied = !!o.occupied; }));
+        if (o.resetExtras) {
+          s.workers.forEach((w) => { w.extra = false; });
+          for (const n of SHIFTS) s.shifts[n].extras = [];
+        }
         break;
       case 'setWorkers': {
         if (!SHIFTS.includes(o.shift)) throw new Error(`no shift ${o.shift}`);
@@ -220,6 +224,11 @@ export function applyOps(state, ops) {
         if (!Array.isArray(o.counts) || o.counts.length < 1 || o.counts.length > MAX_WORKERS
             || !o.counts.every((c) => Number.isInteger(c) && c >= 0 && c <= 10000)) {
           throw new Error('finalize needs a list of patient counts');
+        }
+        if (o.resetExtras) {
+          s.workers.forEach((w) => { w.extra = false; });
+          for (const n of SHIFTS) s.shifts[n].extras = [];
+          break;
         }
         s.shifts[o.shift].extras = nextFlags(s.shifts[o.shift].extras, o.counts);
         if (s.workers.length && Array.isArray(o.workerIds)) {
