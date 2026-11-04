@@ -3,36 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#111418">
   <title>Bed Divider</title>
   <meta name="description" content="Split the occupied beds in a unit evenly among the staff on shift.">
   <style>
 :root {
-  --bg: #f6f7f9;
-  --surface: #ffffff;
-  --text: #1b1f24;
-  --muted: #5d6673;
-  --border: #d9dde3;
-  --accent: #1f6feb;
+  color-scheme: dark;
+  --bg: #111418;
+  --surface: #1a1f25;
+  --text: #e6e9ed;
+  --muted: #9aa3ae;
+  --border: #2f3640;
+  --accent: #4c8dff;
   --accent-text: #ffffff;
-  --empty-bg: #ffffff;
-  --empty-text: #8a929d;
+  --empty-bg: #1a1f25;
+  --empty-text: #6f7884;
   --radius: 10px;
   --orange: #f5891f;
   --on-orange: #241300;
-  --bed-line: #b9c0c9;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111418;
-    --surface: #1a1f25;
-    --text: #e6e9ed;
-    --muted: #9aa3ae;
-    --border: #2f3640;
-    --accent: #4c8dff;
-    --empty-bg: #1a1f25;
-    --empty-text: #6f7884;
-    --bed-line: #4a5360;
-  }
+  --bed-line: #4a5360;
+  --error: #ff7b72;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -152,7 +143,7 @@ textarea, input[type=text], input[type=number] {
 .assign-list .range { font-size: 1.3rem; font-weight: 700; margin: 2px 0 0; }
 .assign-list .rooms, .assign-list .open { color: var(--muted); font-size: 0.9rem; margin: 2px 0 0; }
 .layout-note { font-size: 0.9rem; border-radius: 8px; padding: 8px 10px; margin: 0 0 10px; background: var(--bg); color: var(--muted); }
-.layout-note.error { color: #b42318; border: 1px solid #b42318; }
+.layout-note.error { color: var(--error); border: 1px solid var(--error); }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 0.9rem; color: var(--muted); margin: 8px 0; }
 .check input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
 .card .span { margin: 0; font-size: 0.9rem; color: var(--muted); }
