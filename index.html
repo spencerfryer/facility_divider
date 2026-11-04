@@ -212,9 +212,10 @@ textarea, input[type=text], input[type=number] {
 .legend .key + .key, .legend .key:not(:first-child) { margin-left: 8px; }
 .census { flex-basis: 100%; }
 .assign-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.assign-list li { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
-.assign-list .who { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 650; }
-.assign-list .right-meta { display: flex; flex-direction: column; align-items: flex-end; text-align: right; line-height: 1.25; }
+.assign-list li { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.assign-list .left-col { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; flex: 1; }
+.assign-list .right-meta { display: flex; flex-direction: column; align-items: flex-end; text-align: right; line-height: 1.25; gap: 2px; flex: none; }
+.assign-list .right-meta .tag { margin-top: 2px; }
 .assign-list .assign-num { color: var(--accent); font-weight: 700; font-size: 0.9rem; white-space: nowrap; }
 .assign-list .count { color: var(--muted); font-weight: 500; white-space: nowrap; }
 .assign-list .range { font-size: 1.3rem; font-weight: 700; margin: 2px 0 0; padding-left: 11px; }
@@ -284,7 +285,7 @@ textarea, input[type=text], input[type=number] {
     break-inside: avoid;
     page-break-inside: avoid;
   }
-  .assign-list .who, .assign-list .right-meta { display: contents; }
+  .assign-list .left-col, .assign-list .right-meta { display: contents; }
   .assign-list .assign-num { display: none !important; }
   .worker-wrap { grid-column: 1; grid-row: 1; }
   .worker-pick {
@@ -932,7 +933,7 @@ textarea, input[type=text], input[type=number] {
     const shiftColor = SHIFT_COLORS[tab()] || SHIFT_COLORS.AM;
     groups.forEach((g, i) => {
       const li = el('li');
-      const who = el('div', 'who');
+      const leftCol = el('div', 'left-col');
       const wrap = el('div', 'worker-wrap');
       const pick = el('button', 'worker-pick');
       pick.type = 'button';
@@ -950,11 +951,17 @@ textarea, input[type=text], input[type=number] {
         if (openMenuSlot >= 0) $('worker-modal-body').scrollTop = 0;
       });
       wrap.append(pick);
+      leftCol.append(wrap);
 
-      if (activeFlags[i]) {
-        const tag = el('span', 'tag', 'had extra');
-        tag.title = 'Got an extra patient earlier this round, so the next extras go to others first.';
-        wrap.append(tag);
+      const occ = g.occupied;
+      if (!occ.length) {
+        leftCol.append(el('p', 'range', 'No patients'));
+      } else {
+        const first = occ[0], last = occ[occ.length - 1];
+        leftCol.append(el('p', 'range', first === last ? `Bed ${first}` : `Beds ${first} – ${last}`));
+        const a = bedOrder.indexOf(first), b = bedOrder.indexOf(last);
+        const skipped = bedOrder.slice(a, b + 1).filter((id) => !occ.includes(id));
+        if (skipped.length) leftCol.append(el('p', 'open', `Skip (empty): ${skipped.join(', ')}`));
       }
 
       const rightMeta = el('div', 'right-meta');
@@ -962,18 +969,13 @@ textarea, input[type=text], input[type=number] {
         el('span', 'assign-num', `Assignment ${i + 1}`),
         el('span', 'count', `${g.occupied.length} patient${g.occupied.length === 1 ? '' : 's'}`)
       );
-      who.append(wrap, rightMeta);
-      li.append(who);
-      const occ = g.occupied;
-      if (!occ.length) {
-        li.append(el('p', 'range', 'No patients'));
-      } else {
-        const first = occ[0], last = occ[occ.length - 1];
-        li.append(el('p', 'range', first === last ? `Bed ${first}` : `Beds ${first} – ${last}`));
-        const a = bedOrder.indexOf(first), b = bedOrder.indexOf(last);
-        const skipped = bedOrder.slice(a, b + 1).filter((id) => !occ.includes(id));
-        if (skipped.length) li.append(el('p', 'open', `Skip (empty): ${skipped.join(', ')}`));
+      if (activeFlags[i]) {
+        const tag = el('span', 'tag', 'had extra');
+        tag.title = 'Got an extra patient earlier this round, so the next extras go to others first.';
+        rightMeta.append(tag);
       }
+
+      li.append(leftCol, rightMeta);
       results.append(li);
     });
 
