@@ -70,3 +70,53 @@ test('parseBedList handles ranges, prefixes, and lists', () => {
   assert.deepStrictEqual(parseBedList('01-03'), ['01', '02', '03']);
   assert.deepStrictEqual(parseBedList('1-2, 2, 3'), ['1', '2', '3']);
 });
+
+const { divideRooms } = Object.fromEntries(
+  Object.entries(sandbox.self.Divider).map(([k, fn]) => [k, wrap(fn)]));
+
+// spec like "xx|x.|..|xxx" -> rooms 1..n with beds A,B,C
+const rooms = (spec) => spec.split('|').map((r, i) => ({
+  name: String(i + 1),
+  beds: r.split('').map((c, j) => ({ id: `${i + 1}${'ABC'[j]}`, occupied: c === 'x' })),
+}));
+
+test('rooms are never split between staff', () => {
+  const rs = rooms('xxx|xx|xxx|x.|xx.|xxx|..|x.x');
+  for (let k = 1; k <= 6; k++) {
+    const r = divideRooms(rs, k);
+    const seen = r.groups.flatMap((g) => g.rooms);
+    assert.deepStrictEqual(seen, rs.map((x) => x.name), `k=${k}`);
+    r.groups.forEach((g) => {
+      const ids = [...g.occupied, ...g.empty];
+      g.rooms.forEach((name) => rs.find((x) => x.name === name).beds.forEach((b) => assert.ok(ids.includes(b.id))));
+    });
+  }
+});
+
+test('room split is as even as possible', () => {
+  // loads 2,2,2,2,2,2 into 3 -> 4,4,4
+  const r = divideRooms(rooms('xx|xx|xx|xx|xx|xx'), 3);
+  assert.deepStrictEqual(r.groups.map((g) => g.occupied.length), [4, 4, 4]);
+  // loads 3,3,2,2 into 2: best contiguous split is [3,3] [2,2] = 6/4
+  const r2 = divideRooms(rooms('xxx|xxx|xx|xx'), 2);
+  assert.deepStrictEqual(r2.groups.map((g) => g.occupied.length), [6, 4]);
+});
+
+test('empty rooms between blocks go to the earlier person', () => {
+  const r = divideRooms(rooms('xx|..|xx'), 2);
+  assert.deepStrictEqual(r.groups.map((g) => g.rooms), [['1', '2'], ['3']]);
+});
+
+test('no patients spreads rooms evenly', () => {
+  const r = divideRooms(rooms('..|..|..|..|..'), 2);
+  assert.deepStrictEqual(r.groups.map((g) => g.rooms), [['1', '2', '3'], ['4', '5']]);
+});
+
+test('38 rooms with 5 staff stays fast and balanced', () => {
+  const spec = Array.from({ length: 38 }, (_, i) => (i % 3 === 0 ? 'xxx' : i % 5 === 0 ? 'x.' : 'xx')).join('|');
+  const t = Date.now();
+  const r = divideRooms(rooms(spec), 5);
+  assert.ok(Date.now() - t < 500);
+  const loads = r.groups.map((g) => g.occupied.length);
+  assert.ok(Math.max(...loads) - Math.min(...loads) <= 3, String(loads));
+});

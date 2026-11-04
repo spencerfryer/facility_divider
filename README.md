@@ -4,12 +4,13 @@ A small web page that splits the occupied beds in a unit evenly among the staff 
 
 ## How it works
 
-1. **Beds.** List the beds in the order they sit on the unit (for example `1-20`, or `A1-A12, B1-B8`, or one name per line). Tap a bed to mark it occupied or empty.
+1. **Rooms and beds.** The default layout is 38 rooms (`1-38`) with 2 beds each (A, B). Use **Edit layout** to rename rooms (ranges like `101-138` work) and tap a room's name to switch it between 2 and 3 beds. List rooms in hallway order. Then tap beds to mark them occupied or empty.
 2. **Staff.** Set how many people are working. Names are optional.
-3. **Assignments.** Occupied beds are divided into one block per person:
-   - Each person gets a **contiguous run** of beds in list order, so assignments stay geographically together.
-   - Patient counts differ by **at most one**. When it doesn't divide evenly, the first people in the list get the extra patient.
-   - Each **empty bed** is listed with the person whose block it sits in (beds before the first patient go to the first person), so everyone knows which open beds are theirs for admissions.
+3. **Assignments.** Rooms are divided into one block per person:
+   - **A room is never split between people**, and each person gets a **contiguous run of rooms**, so assignments stay geographically together.
+   - Among all such splits, the calculator picks the one with the **most even patient counts**. Because rooms can't be split, counts may differ by a couple of patients.
+   - Each person's **open beds** are listed too, so everyone knows which admissions are theirs.
+   - Tick **Allow a room's beds to be split between people** to divide bed by bed instead. Counts then differ by at most one, but roommates can end up with different staff.
 
 Everything is saved in the browser's local storage on that device only. Nothing is sent anywhere.
 

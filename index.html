@@ -121,9 +121,25 @@ textarea, input[type=text], input[type=number] {
 
 .foot { color: var(--muted); font-size: 0.85rem; padding-bottom: 32px; }
 
+.room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
+.room { border: 2px solid var(--border); border-radius: 8px; padding: 4px 6px 6px; }
+.room-name {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 4px; width: 100%;
+  background: none; border: none; color: var(--text); padding: 2px 2px 4px; min-height: 0;
+  font-weight: 700; text-align: left; cursor: default;
+}
+.room-name:disabled { opacity: 1; }
+.editing .room-name { cursor: pointer; color: var(--accent); text-decoration: underline; }
+.bed-count { font-size: 0.75rem; font-weight: 500; color: var(--muted); }
+.beds-row { display: flex; gap: 4px; }
+.beds-row .bed { flex: 1; min-height: 40px; min-width: 0; padding: 4px 0; font-weight: 650; }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 0.9rem; color: var(--muted); margin: 8px 0; }
+.check input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
+.card .span { margin: 0; font-size: 0.9rem; color: var(--muted); }
+
 @media print {
   body { background: #fff; color: #000; }
-  .top .sub, .row, .hint, .names, #print, .foot, #edit-beds-toggle, .bed-editor { display: none !important; }
+  .top .sub, .row, .hint, .names, #print, .foot, #edit-toggle, .bed-editor, .check { display: none !important; }
   .panel { border: none; padding: 0; margin: 8px 0; }
   .bed, .card { -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; }
 }
@@ -132,29 +148,29 @@ textarea, input[type=text], input[type=number] {
 <body>
   <header class="top">
     <h1>Bed Divider</h1>
-    <p class="sub">Mark which beds are occupied, set how many people are working, and get an even split.</p>
+    <p class="sub">Mark which beds are occupied, set how many people are working, and get an even split by room.</p>
   </header>
 
   <main>
     <section class="panel" aria-labelledby="beds-h">
       <div class="panel-head">
-        <h2 id="beds-h">1. Beds</h2>
-        <button type="button" class="link" id="edit-beds-toggle" aria-expanded="false">Edit bed list</button>
+        <h2 id="beds-h">1. Rooms and beds</h2>
+        <button type="button" class="link" id="edit-toggle" aria-expanded="false">Edit layout</button>
       </div>
-      <div id="bed-editor" class="bed-editor" hidden>
-        <label for="bed-list">Bed names in layout order. Use commas or new lines; ranges like <code>1-20</code> or <code>A1-A12</code> work.</label>
-        <textarea id="bed-list" rows="4" spellcheck="false"></textarea>
+      <div id="layout-editor" class="bed-editor" hidden>
+        <label for="room-list">Room names in hallway order. Use commas or new lines; ranges like <code>1-38</code> or <code>101-138</code> work.</label>
+        <textarea id="room-list" rows="3" spellcheck="false"></textarea>
         <div class="row">
-          <button type="button" id="apply-beds">Update beds</button>
-          <span class="hint">Occupied marks are kept for beds whose names don't change.</span>
+          <button type="button" id="apply-rooms">Update rooms</button>
         </div>
+        <p class="hint"><strong>While this panel is open, tap a room's name to switch it between 2 and 3 beds.</strong> Close it when you're done. Your layout is remembered on this device.</p>
       </div>
       <p class="hint">Tap a bed to mark it occupied or empty. <span id="census"></span></p>
       <div class="row tight">
         <button type="button" class="ghost" id="all-occ">All occupied</button>
         <button type="button" class="ghost" id="all-empty">All empty</button>
       </div>
-      <div id="bed-grid" class="bed-grid" role="group" aria-label="Beds"></div>
+      <div id="room-grid" class="room-grid" role="group" aria-label="Rooms"></div>
     </section>
 
     <section class="panel" aria-labelledby="staff-h">
@@ -163,10 +179,11 @@ textarea, input[type=text], input[type=number] {
         <label for="staff-count" class="inline">Number of people</label>
         <div class="stepper">
           <button type="button" id="staff-minus" aria-label="One fewer">−</button>
-          <input id="staff-count" type="number" min="1" max="50" value="3" inputmode="numeric">
+          <input id="staff-count" type="number" min="1" max="50" value="4" inputmode="numeric">
           <button type="button" id="staff-plus" aria-label="One more">+</button>
         </div>
       </div>
+      <label class="check"><input type="checkbox" id="split-rooms"> Allow a room's beds to be split between people (more even counts, but roommates can end up with different staff)</label>
       <details class="names">
         <summary>Add names (optional)</summary>
         <div id="staff-names" class="staff-names"></div>
@@ -183,7 +200,7 @@ textarea, input[type=text], input[type=number] {
   </main>
 
   <footer class="foot">
-    <p>Runs entirely in your browser. Nothing is sent anywhere; your bed list and names are saved on this device only. <button type="button" class="link" id="reset">Reset everything</button></p>
+    <p>Runs entirely in your browser. Nothing is sent anywhere; your layout and names are saved on this device only. <button type="button" class="link" id="reset">Reset everything</button></p>
   </footer>
 
   <script id="divide-logic">
@@ -260,6 +277,74 @@ textarea, input[type=text], input[type=number] {
     return { groups, unassignedEmpty: [] };
   }
 
+
+  /**
+   * Room-aware split: rooms are never split between staff. Rooms stay in list
+   * order and each person gets a contiguous run of rooms. Among all ways to do
+   * that, pick the one with the most even patient counts (smallest sum of
+   * squared loads). Empty rooms sitting between two people's blocks go to the
+   * earlier person, like empty beds do in divideBeds.
+   *
+   * @param {{name: string, beds: {id: string, occupied: boolean}[]}[]} rooms
+   * @param {number} staffCount
+   * @returns {{groups: {rooms: string[], occupied: string[], empty: string[]}[]}}
+   */
+  function divideRooms(rooms, staffCount) {
+    const k = Math.max(0, Math.floor(Number(staffCount) || 0));
+    const n = rooms.length;
+    const load = rooms.map((r) => r.beds.filter((b) => b.occupied).length);
+    const total = load.reduce((a, b) => a + b, 0);
+
+    // cuts[g] = index of the first room in group g; cuts[k] = n.
+    let cuts;
+    if (k === 0) {
+      return { groups: [] };
+    } else if (total === 0) {
+      // No patients: spread the rooms evenly so everyone has some for admissions.
+      cuts = [0];
+      evenSizes(n, k).forEach((s, g) => cuts.push(cuts[g] + s));
+    } else {
+      const P = [0];
+      load.forEach((l, i) => P.push(P[i] + l));
+      const INF = Infinity;
+      // dp[j][i]: best cost putting the first i rooms into j groups.
+      const dp = [];
+      const from = [];
+      for (let j = 0; j <= k; j++) { dp.push(new Array(n + 1).fill(INF)); from.push(new Array(n + 1).fill(0)); }
+      dp[0][0] = 0;
+      for (let j = 1; j <= k; j++) {
+        for (let i = 0; i <= n; i++) {
+          for (let a = 0; a <= i; a++) {
+            if (dp[j - 1][a] === INF) continue;
+            const s = P[i] - P[a];
+            const c = dp[j - 1][a] + s * s;
+            if (c < dp[j][i]) { dp[j][i] = c; from[j][i] = a; }
+          }
+        }
+      }
+      cuts = new Array(k + 1);
+      cuts[k] = n;
+      for (let j = k; j >= 1; j--) cuts[j - 1] = from[j][cuts[j]];
+      // Move empty rooms at the start of a block back to the previous person,
+      // as long as the block keeps at least one room with patients.
+      for (let g = 1; g < k; g++) {
+        const hasPatients = (a, b) => P[b] - P[a] > 0;
+        while (cuts[g] < cuts[g + 1] && load[cuts[g]] === 0 && hasPatients(cuts[g] + 1, cuts[g + 1])) cuts[g]++;
+      }
+    }
+
+    const groups = [];
+    for (let g = 0; g < k; g++) {
+      const grp = { rooms: [], occupied: [], empty: [] };
+      for (let i = cuts[g]; i < cuts[g + 1]; i++) {
+        grp.rooms.push(rooms[i].name);
+        rooms[i].beds.forEach((b) => (b.occupied ? grp.occupied : grp.empty).push(b.id));
+      }
+      groups.push(grp);
+    }
+    return { groups };
+  }
+
   /**
    * Turn free text into bed ids. Accepts commas or newlines, and ranges like
    * "1-20" or "A1-A12" (same prefix, numeric suffix).
@@ -287,28 +372,33 @@ textarea, input[type=text], input[type=number] {
     return out.filter((id, i) => out.indexOf(id) === i);
   }
 
-  const api = { evenSizes, divideBeds, parseBedList };
+  const api = { evenSizes, divideBeds, divideRooms, parseBedList };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Divider = api;
 })(typeof self !== 'undefined' ? self : this);
   </script>
   <script>
 (function () {
-  const { divideBeds, parseBedList } = window.Divider;
-  const STORE = 'bed-divider:v1';
+  const { divideBeds, divideRooms, parseBedList } = window.Divider;
+  const STORE = 'bed-divider:v2';
+  const LETTERS = 'ABC';
   // Distinct colors that keep white text readable.
   const COLORS = ['#1f6feb', '#d1453b', '#1a7f37', '#8250df', '#bc4c00', '#0a7d8c', '#bf3989', '#6e7781',
                   '#9a6700', '#0550ae', '#a40e26', '#116329', '#6639ba', '#953800', '#1b7c83', '#99286e'];
   const color = (i) => COLORS[i % COLORS.length];
 
-  const defaults = () => ({ bedText: '1-20', beds: parseBedList('1-20'), occupied: {}, staffCount: 3, names: [] });
+  const defaults = () => ({
+    roomText: '1-38', rooms: parseBedList('1-38'), threeBed: {}, occupied: {},
+    staffCount: 4, names: [], splitRooms: false,
+  });
 
   let state = load();
+  let editing = false;
 
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(STORE));
-      if (s && Array.isArray(s.beds)) return Object.assign(defaults(), s);
+      if (s && Array.isArray(s.rooms)) return Object.assign(defaults(), s);
     } catch (e) { /* storage unavailable */ }
     return defaults();
   }
@@ -317,12 +407,20 @@ textarea, input[type=text], input[type=number] {
   }
 
   const $ = (id) => document.getElementById(id);
-  const grid = $('bed-grid');
+  const grid = $('room-grid');
   const results = $('results');
   const countInput = $('staff-count');
   const namesBox = $('staff-names');
 
   const staffName = (i) => (state.names[i] || '').trim() || `Staff ${i + 1}`;
+  const bedCount = (room) => (state.threeBed[room] ? 3 : 2);
+  const buildRooms = () => state.rooms.map((name) => ({
+    name,
+    beds: Array.from({ length: bedCount(name) }, (_, j) => {
+      const id = name + LETTERS[j];
+      return { id, occupied: !!state.occupied[id] };
+    }),
+  }));
 
   function setStaffCount(n) {
     n = Math.max(1, Math.min(50, Math.floor(Number(n) || 1)));
@@ -333,8 +431,7 @@ textarea, input[type=text], input[type=number] {
   }
 
   function renderNames() {
-    const existing = namesBox.querySelectorAll('input').length;
-    if (existing === state.staffCount) return;
+    if (namesBox.querySelectorAll('input').length === state.staffCount) return;
     namesBox.innerHTML = '';
     for (let i = 0; i < state.staffCount; i++) {
       const label = document.createElement('label');
@@ -352,107 +449,138 @@ textarea, input[type=text], input[type=number] {
     }
   }
 
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
   function update() {
-    const beds = state.beds.map((id) => ({ id, occupied: !!state.occupied[id] }));
-    const { groups } = divideBeds(beds, state.staffCount);
+    const rooms = buildRooms();
+    const allBeds = rooms.flatMap((r) => r.beds);
+    const { groups } = state.splitRooms
+      ? divideBeds(allBeds, state.staffCount)
+      : divideRooms(rooms, state.staffCount);
     const ownerOf = {};
     groups.forEach((g, i) => [...g.occupied, ...g.empty].forEach((id) => { ownerOf[id] = i; }));
 
-    // Bed grid
+    // Room grid
     grid.innerHTML = '';
-    for (const b of beds) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      const owner = ownerOf[b.id];
-      btn.className = 'bed ' + (b.occupied ? 'occupied' : 'empty') + (owner != null ? ' owned' : '');
-      btn.setAttribute('aria-pressed', String(b.occupied));
-      btn.setAttribute('aria-label', `Bed ${b.id}, ${b.occupied ? 'occupied' : 'empty'}` + (owner != null ? `, ${staffName(owner)}` : ''));
-      if (b.occupied && owner != null) { btn.style.background = color(owner); btn.style.borderColor = color(owner); }
-      else if (owner != null) { btn.style.color = color(owner); }
-      const name = document.createElement('span');
-      name.className = 'name';
-      name.textContent = b.id;
-      const who = document.createElement('span');
-      who.className = 'who';
-      who.textContent = b.occupied ? (owner != null ? staffName(owner) : '') : 'empty';
-      btn.append(name, who);
-      btn.addEventListener('click', () => {
-        if (state.occupied[b.id]) delete state.occupied[b.id]; else state.occupied[b.id] = true;
-        update();
-      });
-      grid.append(btn);
+    grid.classList.toggle('editing', editing);
+    for (const room of rooms) {
+      const box = el('div', 'room');
+      const roomOwner = ownerOf[room.beds[0].id];
+      const single = room.beds.every((b) => ownerOf[b.id] === roomOwner);
+      if (single && roomOwner != null) box.style.borderColor = color(roomOwner);
+
+      const head = el('button', 'room-name');
+      head.type = 'button';
+      head.textContent = room.name;
+      if (editing) {
+        head.append(el('span', 'bed-count', `${room.beds.length} beds`));
+        head.setAttribute('aria-label', `Room ${room.name}, ${room.beds.length} beds. Tap to switch to ${room.beds.length === 3 ? 2 : 3}.`);
+        head.addEventListener('click', () => {
+          if (state.threeBed[room.name]) {
+            delete state.threeBed[room.name];
+            delete state.occupied[room.name + 'C'];
+          } else state.threeBed[room.name] = true;
+          update();
+        });
+      } else {
+        head.disabled = true;
+        head.setAttribute('aria-label', `Room ${room.name}`);
+      }
+      box.append(head);
+
+      const bedsRow = el('div', 'beds-row');
+      for (const b of room.beds) {
+        const owner = ownerOf[b.id];
+        const btn = el('button', 'bed ' + (b.occupied ? 'occupied' : 'empty') + (owner != null ? ' owned' : ''));
+        btn.type = 'button';
+        btn.setAttribute('aria-pressed', String(b.occupied));
+        btn.setAttribute('aria-label', `Bed ${b.id}, ${b.occupied ? 'occupied' : 'empty'}` + (owner != null ? `, ${staffName(owner)}` : ''));
+        if (b.occupied && owner != null) { btn.style.background = color(owner); btn.style.borderColor = color(owner); }
+        else if (owner != null) btn.style.color = color(owner);
+        btn.textContent = b.id.slice(room.name.length);
+        btn.title = b.occupied ? staffName(owner) : 'empty';
+        btn.addEventListener('click', () => {
+          if (state.occupied[b.id]) delete state.occupied[b.id]; else state.occupied[b.id] = true;
+          update();
+        });
+        bedsRow.append(btn);
+      }
+      box.append(bedsRow);
+      grid.append(box);
     }
 
-    const occCount = beds.filter((b) => b.occupied).length;
-    $('census').textContent = `${occCount} of ${beds.length} occupied.`;
+    const occCount = allBeds.filter((b) => b.occupied).length;
+    $('census').textContent = `${occCount} of ${allBeds.length} beds occupied in ${rooms.length} rooms.`;
 
     // Result cards
     results.innerHTML = '';
     if (occCount === 0) {
-      const p = document.createElement('p');
-      p.className = 'notice';
-      p.textContent = 'No beds are marked occupied yet, so only empty beds are split below.';
-      results.append(p);
+      results.append(el('p', 'notice', 'No beds are marked occupied yet, so the rooms are just split evenly below.'));
     }
     groups.forEach((g, i) => {
-      const card = document.createElement('article');
-      card.className = 'card';
+      const card = el('article', 'card');
       card.style.borderLeftColor = color(i);
-      const h = document.createElement('h3');
-      const nm = document.createElement('span');
-      nm.textContent = staffName(i);
-      const ct = document.createElement('span');
-      ct.className = 'count';
-      ct.textContent = `${g.occupied.length} patient${g.occupied.length === 1 ? '' : 's'}`;
-      h.append(nm, ct);
-      const bedsP = document.createElement('p');
-      bedsP.className = 'beds';
-      bedsP.textContent = g.occupied.length ? g.occupied.join(', ') : 'No occupied beds';
-      card.append(h, bedsP);
-      if (g.empty.length) {
-        const openP = document.createElement('p');
-        openP.className = 'open';
-        openP.textContent = `Empty beds in this area: ${g.empty.join(', ')}`;
-        card.append(openP);
+      const h = el('h3');
+      h.append(el('span', null, staffName(i)),
+               el('span', 'count', `${g.occupied.length} patient${g.occupied.length === 1 ? '' : 's'}`));
+      card.append(h);
+      const roomNames = g.rooms || [...new Set([...g.occupied, ...g.empty].map((id) => id.slice(0, -1)))];
+      if (roomNames.length) {
+        const span = roomNames.length === 1 ? `Room ${roomNames[0]}` : `Rooms ${roomNames[0]} to ${roomNames[roomNames.length - 1]}`;
+        card.append(el('p', 'span', span));
       }
+      card.append(el('p', 'beds', g.occupied.length ? g.occupied.join(', ') : 'No occupied beds'));
+      if (g.empty.length) card.append(el('p', 'open', `Open beds: ${g.empty.join(', ')}`));
       results.append(card);
     });
 
     save();
   }
 
-  // Bed list editor
-  const editor = $('bed-editor');
-  const toggle = $('edit-beds-toggle');
-  const bedList = $('bed-list');
+  // Layout editor
+  const editor = $('layout-editor');
+  const toggle = $('edit-toggle');
+  const roomList = $('room-list');
   toggle.addEventListener('click', () => {
-    const open = editor.hidden;
-    editor.hidden = !open;
-    toggle.setAttribute('aria-expanded', String(open));
-    toggle.textContent = open ? 'Close bed list' : 'Edit bed list';
-    if (open) { bedList.value = state.bedText; bedList.focus(); }
+    editing = editor.hidden;
+    editor.hidden = !editing;
+    toggle.setAttribute('aria-expanded', String(editing));
+    toggle.textContent = editing ? 'Done editing' : 'Edit layout';
+    if (editing) roomList.value = state.roomText;
+    update();
   });
-  $('apply-beds').addEventListener('click', () => {
-    const beds = parseBedList(bedList.value);
-    if (!beds.length) { bedList.focus(); return; }
-    state.bedText = bedList.value;
-    state.beds = beds;
-    const keep = {};
-    beds.forEach((id) => { if (state.occupied[id]) keep[id] = true; });
-    state.occupied = keep;
+  $('apply-rooms').addEventListener('click', () => {
+    const rooms = parseBedList(roomList.value);
+    if (!rooms.length) { roomList.focus(); return; }
+    state.roomText = roomList.value;
+    state.rooms = rooms;
     update();
   });
 
-  $('all-occ').addEventListener('click', () => { state.occupied = {}; state.beds.forEach((id) => { state.occupied[id] = true; }); update(); });
+  $('all-occ').addEventListener('click', () => {
+    state.occupied = {};
+    buildRooms().forEach((r) => r.beds.forEach((b) => { state.occupied[b.id] = true; }));
+    update();
+  });
   $('all-empty').addEventListener('click', () => { state.occupied = {}; update(); });
+
+  const split = $('split-rooms');
+  split.checked = !!state.splitRooms;
+  split.addEventListener('change', () => { state.splitRooms = split.checked; update(); });
 
   countInput.addEventListener('change', () => setStaffCount(countInput.value));
   $('staff-minus').addEventListener('click', () => setStaffCount(state.staffCount - 1));
   $('staff-plus').addEventListener('click', () => setStaffCount(state.staffCount + 1));
   $('print').addEventListener('click', () => window.print());
   $('reset').addEventListener('click', () => {
-    if (!confirm('Clear the bed list, occupied beds, and staff names?')) return;
+    if (!confirm('Clear the room layout, occupied beds, and staff names?')) return;
     state = defaults();
+    split.checked = false;
     namesBox.innerHTML = '';
     setStaffCount(state.staffCount);
   });
