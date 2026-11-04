@@ -138,6 +138,49 @@ textarea, input[type=text], input[type=number] {
 .worker-opt[aria-selected="true"] { background: var(--surface); border-color: var(--tab-active); }
 .worker-opt .slot-note { font-size: 0.75rem; font-weight: 500; color: var(--muted); }
 
+.worker-modal {
+  position: fixed; inset: 0; z-index: 100;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.worker-modal-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+  flex: none;
+}
+.worker-modal-head-inner {
+  max-width: 920px; width: 100%; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.worker-modal-head h3 {
+  margin: 0; font-size: 1.3rem; font-weight: 700;
+}
+.worker-modal-body {
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 12px 16px 32px; max-width: 920px; width: 100%; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.worker-modal .worker-group-label {
+  font-size: 0.85rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 10px 4px 4px;
+}
+.worker-modal .worker-group-label:not(:first-child) {
+  border-top: 1px solid var(--border); margin-top: 10px; padding-top: 14px;
+}
+.worker-modal .worker-opt {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 14px; min-height: 48px;
+  font-size: 1.3rem; font-weight: 700;
+}
+.worker-modal .worker-opt:hover { border-color: var(--tab-active); }
+.worker-modal .worker-opt[aria-selected="true"] {
+  background: var(--tab-active); color: var(--accent-text); border-color: var(--tab-active);
+}
+.worker-modal .worker-opt .slot-note { font-size: 0.95rem; font-weight: 600; color: var(--muted); }
+.worker-modal .worker-opt[aria-selected="true"] .slot-note { color: var(--accent-text); }
+
 .results { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .card { border: 1px solid var(--border); border-left: 6px solid; border-radius: 8px; padding: 10px 12px; }
 .card h3 { margin: 0 0 4px; font-size: 1rem; display: flex; justify-content: space-between; gap: 8px; }
@@ -210,7 +253,7 @@ textarea, input[type=text], input[type=number] {
 @media print {
   :root { color-scheme: light; }
   html, body { background: #fff !important; color: #000 !important; font-size: 14px; }
-  .top, .row, .hint, .worker-menu, .worker-pick .caret, .shift-dot, .tabs, #finalize-status, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type { display: none !important; }
+  .top, .row, .hint, .worker-menu, .worker-modal, .worker-pick .caret, .shift-dot, .tabs, #finalize-status, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type { display: none !important; }
   main { max-width: none; padding: 0; margin: 0; }
   .panel { background: #fff !important; color: #000 !important; border: none; padding: 0; margin: 0; }
   .panel > h2 { display: none; }
@@ -342,6 +385,16 @@ textarea, input[type=text], input[type=number] {
     <p>Rooms, beds, and worker assignments are shared through the passcode-protected bed list. <button type="button" class="link" id="reset">Reset everything</button></p>
     <p class="sync" id="sync-status" hidden></p>
   </footer>
+
+  <div id="worker-modal" class="worker-modal" role="dialog" aria-modal="true" aria-labelledby="worker-modal-title" hidden>
+    <div class="worker-modal-head">
+      <div class="worker-modal-head-inner">
+        <h3 id="worker-modal-title">Assignment 1</h3>
+        <button type="button" class="ghost" id="worker-modal-close">Close</button>
+      </div>
+    </div>
+    <div id="worker-modal-body" class="worker-modal-body" role="listbox"></div>
+  </div>
 
   <script id="divide-logic">
 /**
@@ -888,8 +941,10 @@ textarea, input[type=text], input[type=number] {
       pick.append(dot, el('span', 'worker-label', staffName(i)), el('span', 'caret', '▾'));
       pick.addEventListener('click', (e) => {
         e.stopPropagation();
+        closeToolsMenu();
         openMenuSlot = openMenuSlot === i ? -1 : i;
         update();
+        if (openMenuSlot >= 0) $('worker-modal-body').scrollTop = 0;
       });
       wrap.append(pick);
 
@@ -897,36 +952,6 @@ textarea, input[type=text], input[type=number] {
         const tag = el('span', 'tag', 'had extra');
         tag.title = 'Got an extra patient earlier this round, so the next extras go to others first.';
         wrap.append(tag);
-      }
-
-      if (isOpen) {
-        const menu = el('div', 'worker-menu');
-        menu.setAttribute('role', 'listbox');
-        menu.setAttribute('aria-label', `Choose worker for slot ${i + 1}`);
-        menu.addEventListener('click', (e) => e.stopPropagation());
-        for (const shName of shiftOrder) {
-          const groupWorkers = pool
-            .filter((w) => w.shift === shName)
-            .slice()
-            .sort((a, b) => a.name.localeCompare(b.name));
-          if (!groupWorkers.length) continue;
-          menu.append(el('div', 'worker-group-label', shName));
-          for (const w of groupWorkers) {
-            const opt = el('button', 'worker-opt');
-            opt.type = 'button';
-            opt.setAttribute('role', 'option');
-            const selected = w.id === staffId(i);
-            opt.setAttribute('aria-selected', String(selected));
-            opt.append(el('span', null, w.name));
-            const assignedAt = currentIds.indexOf(w.id);
-            if (assignedAt >= 0 && assignedAt !== i) {
-              opt.append(el('span', 'slot-note', `#${assignedAt + 1}`));
-            }
-            opt.addEventListener('click', () => assignWorker(i, w.id));
-            menu.append(opt);
-          }
-        }
-        wrap.append(menu);
       }
 
       who.append(wrap,
@@ -944,6 +969,43 @@ textarea, input[type=text], input[type=number] {
       }
       results.append(li);
     });
+
+    const modal = $('worker-modal');
+    const modalBody = $('worker-modal-body');
+    if (openMenuSlot >= 0 && openMenuSlot < groups.length) {
+      const i = openMenuSlot;
+      $('worker-modal-title').textContent = `Assignment ${i + 1}`;
+      modalBody.setAttribute('aria-label', `Assignment ${i + 1}`);
+      modalBody.innerHTML = '';
+      for (const shName of shiftOrder) {
+        const groupWorkers = pool
+          .filter((w) => w.shift === shName)
+          .slice()
+          .sort((a, b) => a.name.localeCompare(b.name));
+        if (!groupWorkers.length) continue;
+        modalBody.append(el('div', 'worker-group-label', shName));
+        for (const w of groupWorkers) {
+          const opt = el('button', 'worker-opt');
+          opt.type = 'button';
+          opt.setAttribute('role', 'option');
+          const selected = w.id === staffId(i);
+          opt.setAttribute('aria-selected', String(selected));
+          opt.append(el('span', null, w.name));
+          const assignedAt = currentIds.indexOf(w.id);
+          if (assignedAt >= 0 && assignedAt !== i) {
+            opt.append(el('span', 'slot-note', `#${assignedAt + 1}`));
+          }
+          opt.addEventListener('click', () => assignWorker(i, w.id));
+          modalBody.append(opt);
+        }
+      }
+      modal.hidden = false;
+      document.body.style.overflow = 'hidden';
+    } else {
+      modal.hidden = true;
+      modalBody.innerHTML = '';
+      document.body.style.overflow = '';
+    }
 
     save();
   }
@@ -1336,6 +1398,11 @@ textarea, input[type=text], input[type=number] {
     importFileInput.value = '';
   });
 
+  $('worker-modal').addEventListener('click', (e) => e.stopPropagation());
+  $('worker-modal-close').addEventListener('click', () => {
+    openMenuSlot = -1;
+    update();
+  });
   document.addEventListener('click', () => {
     closeToolsMenu();
     if (openMenuSlot !== -1) { openMenuSlot = -1; update(); }
