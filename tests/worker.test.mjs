@@ -88,17 +88,23 @@ test('worker counts and selected worker ids are saved per shift', () => {
   assert.throws(() => applyOps(s, [{ op: 'setWorkers', shift: 'LATE', workers: 2 }]), /no shift LATE/);
 });
 
-test('finalize validates patient counts and keeps rolling list of last 3 finalizations', () => {
+test('finalize validates patient counts and keeps rolling list of last 3 finalizations per shift', () => {
   let s = applyOps(seed(), [{ op: 'finalize', shift: 'AM', counts: [4, 3], at: '2026-11-04T08:00:00Z' }]);
   assert.strictEqual(s.shifts.AM.history, undefined);
-  assert.deepStrictEqual(s.finalizations, [{ shift: 'AM', at: '2026-11-04T08:00:00Z' }]);
+  assert.deepStrictEqual(s.shifts.AM.finalizations, ['2026-11-04T08:00:00Z']);
+  assert.deepStrictEqual(s.shifts.PM.finalizations, []);
   s = applyOps(s, [
-    { op: 'finalize', shift: 'PM', counts: [4, 3], at: '2026-11-04T16:00:00Z' },
-    { op: 'finalize', shift: 'NOC', counts: [4, 3], at: '2026-11-05T00:00:00Z' },
     { op: 'finalize', shift: 'AM', counts: [4, 3], at: '2026-11-05T08:00:00Z' },
+    { op: 'finalize', shift: 'AM', counts: [4, 3], at: '2026-11-06T08:00:00Z' },
+    { op: 'finalize', shift: 'AM', counts: [4, 3], at: '2026-11-07T08:00:00Z' },
+    { op: 'finalize', shift: 'PM', counts: [4, 3], at: '2026-11-07T16:00:00Z' },
   ]);
-  assert.strictEqual(s.finalizations.length, 3);
-  assert.deepStrictEqual(s.finalizations.map((f) => f.shift), ['AM', 'NOC', 'PM']);
+  assert.deepStrictEqual(s.shifts.AM.finalizations, [
+    '2026-11-07T08:00:00Z',
+    '2026-11-06T08:00:00Z',
+    '2026-11-05T08:00:00Z',
+  ]);
+  assert.deepStrictEqual(s.shifts.PM.finalizations, ['2026-11-07T16:00:00Z']);
   assert.throws(() => applyOps(s, [{ op: 'finalize', shift: 'AM', counts: [] }]), /patient counts/);
   assert.throws(() => applyOps(s, [{ op: 'finalize', shift: 'AM', counts: [1.5] }]), /patient counts/);
 });

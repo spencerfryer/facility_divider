@@ -702,13 +702,14 @@ textarea, input[type=text], input[type=number] {
     workers: 4,
     ids: shiftDefaultIds(n, 4),
     extras: [],
+    finalizations: [],
   }]));
-  const defaults = () => ({ empty: {}, tab: 'AM', workers: allWorkers.map((w) => ({ ...w })), shifts: newShifts(), finalizations: [] });
+  const defaults = () => ({ empty: {}, tab: 'AM', workers: allWorkers.map((w) => ({ ...w })), shifts: newShifts() });
 
   let state = load();
   let layout = parseLayout(FALLBACK_LAYOUT);
   // Shared mode: the Worker's copy of which beds are empty, keyed by bed id.
-  let shared = { on: false, version: 0, empty: {}, workers: null, shifts: null, finalizations: [] };
+  let shared = { on: false, version: 0, empty: {}, workers: null, shifts: null };
   let editing = false;
   let openMenuSlot = -1;
   const pending = [];        // changes waiting to be sent to the Worker
@@ -763,12 +764,13 @@ textarea, input[type=text], input[type=number] {
         out.shifts = newShifts();
         for (const n of SHIFTS) {
           Object.assign(out.shifts[n], (s.shifts && s.shifts[n]) || {});
+          out.shifts[n].finalizations = Array.isArray(out.shifts[n].finalizations)
+            ? out.shifts[n].finalizations.filter((t) => typeof t === 'string' && t.trim()).slice(0, 3)
+            : [];
           syncShiftIds(out.shifts[n], n);
         }
         if (!SHIFTS.includes(out.tab)) out.tab = 'AM';
-        out.finalizations = Array.isArray(s.finalizations)
-          ? s.finalizations.filter((f) => f && SHIFTS.includes(f.shift) && f.at).slice(0, 3)
-          : [];
+        delete out.finalizations;
         return out;
       }
     } catch (e) { /* storage unavailable */ }
@@ -1026,14 +1028,13 @@ textarea, input[type=text], input[type=number] {
       document.body.style.overflow = '';
     }
 
-    const finList = (shared.on && Array.isArray(shared.finalizations) && shared.finalizations.length)
-      ? shared.finalizations
-      : (state.finalizations || []);
+    const finList = (sharedShift() && Array.isArray(sharedShift().finalizations) && sharedShift().finalizations.length)
+      ? sharedShift().finalizations
+      : (local().finalizations || []);
     $('finalizations-list').textContent = finList.length
-      ? finList.slice(0, 3).map((f) => {
-          const d = new Date(f.at);
-          const stamp = isNaN(d) ? String(f.at) : d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
-          return `${f.shift} — ${stamp}`;
+      ? finList.slice(0, 3).map((at) => {
+          const d = new Date(at);
+          return isNaN(d) ? String(at) : d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
         }).join('\n')
       : 'None yet';
 
@@ -1056,21 +1057,21 @@ textarea, input[type=text], input[type=number] {
     const at = new Date().toISOString();
     const prevWorkers = state.workers.map((w) => ({ ...w }));
     const prevExtras = state.shifts[shift].extras.slice();
-    const prevFin = (state.finalizations || []).slice();
+    const prevFin = (state.shifts[shift].finalizations || []).slice();
     state.workers = nextWorkerExtras(workerPool(), shift, ids, counts);
     state.shifts[shift].extras = nextFlags(state.shifts[shift].extras, counts);
-    state.finalizations = [{ shift, at }, ...prevFin].slice(0, 3);
+    state.shifts[shift].finalizations = [at, ...prevFin].slice(0, 3);
     if (sharedShift()) {
       shared.workers = state.workers.map((w) => ({ ...w }));
-      shared.finalizations = state.finalizations.slice();
+      sharedShift().finalizations = state.shifts[shift].finalizations.slice();
       queue({ op: 'finalize', shift, counts, workerIds: ids, at });
       clearTimeout(flushTimer);
       const ok = await flush();
       if (!ok) {
         state.workers = prevWorkers;
         state.shifts[shift].extras = prevExtras;
-        state.finalizations = prevFin;
-        shared.finalizations = prevFin.slice();
+        state.shifts[shift].finalizations = prevFin;
+        sharedShift().finalizations = prevFin.slice();
         setFinalizeStatus(`${shift} was not finalized. Check the message above and try again.`, true);
         update();
       } else {
@@ -1163,15 +1164,15 @@ textarea, input[type=text], input[type=number] {
         if (Array.isArray(saved.shifts[n].ids) && saved.shifts[n].ids.length) {
           state.shifts[n].ids = saved.shifts[n].ids.slice();
         }
+        if (Array.isArray(saved.shifts[n].finalizations) && saved.shifts[n].finalizations.length) {
+          state.shifts[n].finalizations = saved.shifts[n].finalizations.slice(0, 3);
+        }
         syncShiftIds(state.shifts[n], n);
         shared.shifts[n].ids = state.shifts[n].ids.slice();
+        shared.shifts[n].finalizations = (state.shifts[n].finalizations || []).slice(0, 3);
       }
     } else {
       shared.shifts = null;
-    }
-    if (Array.isArray(saved.finalizations) && saved.finalizations.length) {
-      shared.finalizations = saved.finalizations.slice(0, 3);
-      state.finalizations = saved.finalizations.slice(0, 3);
     }
     if (saved.updatedAt) setSync(formatSavedAt(saved.updatedAt));
   }
@@ -1186,8 +1187,8 @@ textarea, input[type=text], input[type=number] {
         workers: state.shifts[n].workers,
         ids: state.shifts[n].ids,
         extras: state.shifts[n].extras,
+        finalizations: (state.shifts[n].finalizations || []).slice(0, 3),
       }])),
-      finalizations: (state.finalizations || []).slice(0, 3),
     };
   }
 
@@ -1482,15 +1483,14 @@ textarea, input[type=text], input[type=number] {
     if (!confirm('Mark every bed occupied again and reset the worker selections to default?')) return;
     const keep = state.shifts;
     const keepWorkers = state.workers;
-    const keepFin = state.finalizations;
     state = defaults();
     state.workers = keepWorkers;
-    state.finalizations = keepFin;
-    // Worker counts and worker extra status are kept.
+    // Worker counts, finalizations, and worker extra status are kept.
     for (const n of SHIFTS) {
       Object.assign(state.shifts[n], {
         workers: keep[n].workers,
         extras: keep[n].extras,
+        finalizations: keep[n].finalizations,
       });
       syncShiftIds(state.shifts[n], n);
     }

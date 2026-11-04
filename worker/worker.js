@@ -151,21 +151,17 @@ export function cleanState(s) {
       workers: clampWorkers(sh.workers ?? 4),
       ids: Array.isArray(sh.ids) ? sh.ids.slice(0, MAX_WORKERS).map((id) => String(id || '').trim().slice(0, 40)).filter(Boolean) : [],
       extras: Array.isArray(sh.extras) ? sh.extras.slice(0, MAX_WORKERS).map(Boolean) : [],
+      finalizations: Array.isArray(sh.finalizations)
+        ? sh.finalizations.filter((t) => typeof t === 'string' && t.trim()).slice(0, 3).map((t) => t.trim().slice(0, 60))
+        : [],
     };
   }
-  const finalizations = Array.isArray(s.finalizations)
-    ? s.finalizations
-        .filter((f) => f && SHIFTS.includes(f.shift) && typeof f.at === 'string' && f.at.trim())
-        .slice(0, 3)
-        .map((f) => ({ shift: f.shift, at: f.at.trim().slice(0, 60) }))
-    : [];
   return {
     version: Number.isInteger(s.version) ? s.version : 0,
     updatedAt: s.updatedAt || null,
     rooms: s.rooms.map((r) => ({ room: r.room, beds: r.beds.map((b) => ({ label: b.label, occupied: b.occupied })) })),
     workers: cleanWorkers(s.workers),
     shifts,
-    finalizations,
   };
 }
 
@@ -230,7 +226,7 @@ export function applyOps(state, ops) {
           s.workers = nextWorkerExtras(s.workers, o.shift, o.workerIds, o.counts);
         }
         const at = typeof o.at === 'string' && o.at.trim() ? o.at.trim().slice(0, 60) : new Date().toISOString();
-        s.finalizations = [{ shift: o.shift, at }, ...(s.finalizations || [])].slice(0, 3);
+        s.shifts[o.shift].finalizations = [at, ...(s.shifts[o.shift].finalizations || [])].slice(0, 3);
         break;
       }
       default:
