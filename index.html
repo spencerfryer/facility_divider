@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#111418">
+  <title>Bed Divider</title>
+  <meta name="description" content="Split the occupied beds in a unit evenly among the staff on shift.">
+  <style>
+:root {
+  color-scheme: dark;
+  --bg: #111418;
+  --surface: #1a1f25;
+  --text: #e6e9ed;
+  --muted: #9aa3ae;
+  --border: #2f3640;
+  --accent: #4c8dff;
+  --accent-text: #ffffff;
+  --empty-bg: #1a1f25;
+  --empty-text: #6f7884;
+  --radius: 10px;
+  --orange: #f5891f;
+  --on-orange: #241300;
+  --bed-line: #4a5360;
+  --error: #ff7b72;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.top, main, .foot { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+.top { padding-top: 24px; }
+h1 { font-size: 1.6rem; margin: 0 0 4px; }
+h2 { font-size: 1.1rem; margin: 0; }
+.sub, .hint { color: var(--muted); margin: 0 0 8px; }
+.hint { font-size: 0.9rem; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin: 16px 0;
+}
+.panel > h2 { margin-bottom: 12px; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0; }
+.row.tight { margin-top: 0; }
+
+button {
+  font: inherit;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  min-height: 40px;
+}
+button.ghost { background: transparent; color: var(--text); border-color: var(--border); }
+button.link { background: none; border: none; color: var(--accent); padding: 0; min-height: 0; text-decoration: underline; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+textarea, input[type=text], input[type=number] {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  width: 100%;
+}
+.bed-editor label { display: block; font-size: 0.9rem; color: var(--muted); margin-bottom: 6px; }
+.bed-editor { margin-bottom: 12px; }
+
+.bed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; }
+.bed {
+  min-height: 56px;
+  padding: 6px 4px;
+  border-radius: 8px;
+  border: 2px dashed var(--border);
+  background: var(--empty-bg);
+  color: var(--empty-text);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  line-height: 1.15;
+}
+.bed .name { font-weight: 650; font-size: 1rem; word-break: break-word; }
+.bed .who { font-size: 0.72rem; opacity: 0.9; }
+.bed.occupied { border-style: solid; color: #fff; }
+.bed.empty.owned { border-color: currentColor; }
+
+.inline { font-weight: 600; }
+.stepper { display: inline-flex; align-items: stretch; }
+.stepper input { width: 4.5em; text-align: center; border-radius: 0; border-left: none; border-right: none; }
+.stepper button:first-child { border-radius: 8px 0 0 8px; }
+.stepper button:last-child { border-radius: 0 8px 8px 0; }
+.stepper button { min-width: 44px; padding: 0; font-size: 1.2rem; }
+
+.names .check { margin-top: 10px; }
+.names summary { cursor: pointer; color: var(--accent); margin-top: 4px; }
+.staff-names { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-top: 10px; }
+.staff-names label { display: flex; align-items: center; gap: 8px; }
+.swatch { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+
+.results { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.card { border: 1px solid var(--border); border-left: 6px solid; border-radius: 8px; padding: 10px 12px; }
+.card h3 { margin: 0 0 4px; font-size: 1rem; display: flex; justify-content: space-between; gap: 8px; }
+.card .count { color: var(--muted); font-weight: 500; white-space: nowrap; }
+.card .beds { font-size: 1.05rem; font-weight: 600; margin: 2px 0; }
+.card .open { color: var(--muted); font-size: 0.9rem; margin: 2px 0 0; }
+.notice { color: var(--muted); }
+
+.foot { color: var(--muted); font-size: 0.85rem; padding-bottom: 32px; }
+
+.room-grid { display: flex; flex-direction: column; gap: 8px; max-width: 520px; }
+.room { display: flex; align-items: stretch; gap: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 6px; background: var(--surface); }
+.room-name {
+  flex: none; width: 3.6em; display: flex; flex-direction: column; justify-content: center; align-items: center;
+  background: none; border: none; color: var(--text); padding: 0; min-height: 0;
+  font-weight: 700; font-size: 1.25rem; cursor: default;
+}
+.beds-row { display: flex; gap: 8px; flex: 1; }
+.beds-row .bed {
+  flex: 1; min-width: 0; min-height: 52px; padding: 0; border-radius: 8px;
+  border: 2px solid var(--bed-line); background: transparent; color: var(--empty-text);
+  font-weight: 700; font-size: 1rem;
+}
+.beds-row .bed.occupied { background: var(--orange); border-color: var(--orange); color: var(--on-orange); }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; color: var(--muted); font-size: 0.9rem; margin: 0 0 10px; }
+.key { display: inline-block; width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--bed-line); }
+.key.occ { background: var(--orange); border-color: var(--orange); }
+.legend .key + .key, .legend .key:not(:first-child) { margin-left: 8px; }
+.census { flex-basis: 100%; }
+.assign-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.assign-list li { border: 1px solid var(--border); border-left: 6px solid; border-radius: 8px; padding: 10px 12px; }
+.assign-list .who { display: flex; justify-content: space-between; gap: 8px; font-weight: 650; }
+.assign-list .count { color: var(--muted); font-weight: 500; white-space: nowrap; }
+.assign-list .range { font-size: 1.3rem; font-weight: 700; margin: 2px 0 0; }
+.assign-list .rooms, .assign-list .open { color: var(--muted); font-size: 0.9rem; margin: 2px 0 0; }
+.layout-note { font-size: 0.9rem; border-radius: 8px; padding: 8px 10px; margin: 0 0 10px; background: var(--bg); color: var(--muted); }
+.layout-note.error { color: var(--error); border: 1px solid var(--error); }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 0.9rem; color: var(--muted); margin: 8px 0; }
+.check input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
+.card .span { margin: 0; font-size: 0.9rem; color: var(--muted); }
+
+@media print {
+  body { background: #fff; color: #000; }
+  .top .sub, .row, .hint, .names, #print, .foot, .layout-note, .check, section:first-of-type { display: none !important; }
+  .panel { border: none; padding: 0; margin: 8px 0; }
+  .bed, .card, .assign-list li { -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; }
+}
+  </style>
+</head>
+<body>
+  <header class="top">
+    <h1>Bed Divider</h1>
+    <p class="sub">Clear the empty beds, enter how many people are working, and get each worker's bed range.</p>
+  </header>
+
+  <main>
+    <section class="panel" aria-labelledby="beds-h">
+      <h2 id="beds-h">1. Rooms</h2>
+      <p class="layout-note" id="layout-note" hidden></p>
+      <p class="hint">Every bed starts as occupied. Tap the empty ones to clear them.</p>
+      <p class="legend"><span class="key occ"></span> Occupied <span class="key"></span> Empty <span class="census" id="census"></span></p>
+      <div class="row tight">
+        <button type="button" class="ghost" id="all-occ">Mark all occupied</button>
+      </div>
+      <div id="room-grid" class="room-grid" role="group" aria-label="Rooms"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="staff-h">
+      <h2 id="staff-h">2. Workers</h2>
+      <div class="row">
+        <label for="staff-count" class="inline">Number of workers</label>
+        <div class="stepper">
+          <button type="button" id="staff-minus" aria-label="One fewer">−</button>
+          <input id="staff-count" type="number" min="1" max="50" value="4" inputmode="numeric">
+          <button type="button" id="staff-plus" aria-label="One more">+</button>
+        </div>
+      </div>
+      <details class="names">
+        <summary>Add worker names (optional)</summary>
+        <div id="staff-names" class="staff-names"></div>
+      </details>
+    </section>
+
+    <section class="panel" aria-labelledby="result-h">
+      <div class="panel-head">
+        <h2 id="result-h">3. Assignments</h2>
+        <button type="button" class="ghost" id="print">Print</button>
+      </div>
+      <ol id="results" class="assign-list" aria-live="polite"></ol>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>Runs entirely in your browser. Nothing is sent anywhere; your layout and names are saved on this device only. <button type="button" class="link" id="reset">Reset everything</button></p>
+  </footer>
+
+  <script id="divide-logic">
+/**
+ * Core splitting logic. Pure functions, no DOM, so it can be tested in Node.
+ *
+ * Beds are kept in the order they are listed (that order stands in for the
+ * physical layout, e.g. down the hall). Occupied beds are split into one
+ * contiguous run per staff member, with group sizes differing by at most one.
+ * Empty beds are attached to whichever group's span they fall inside, so each
+ * person also knows which open beds (admissions) are "theirs".
+ */
+(function (root) {
+  /**
+   * Sizes of `groups` groups covering `total` items as evenly as possible.
+   * Larger groups come first, e.g. evenSizes(10, 3) -> [4, 3, 3].
+   */
+  function evenSizes(total, groups) {
+    if (groups <= 0) return [];
+    const base = Math.floor(total / groups);
+    const extra = total % groups;
+    const sizes = [];
+    for (let i = 0; i < groups; i++) sizes.push(base + (i < extra ? 1 : 0));
+    return sizes;
+  }
+
+  /**
+   * @param {{id: string, occupied: boolean}[]} beds  beds in layout order
+   * @param {number} staffCount
+   * @returns {{groups: {occupied: string[], empty: string[]}[], unassignedEmpty: string[]}}
+   */
+  function divideBeds(beds, staffCount) {
+    const n = Math.max(0, Math.floor(Number(staffCount) || 0));
+    const groups = [];
+    for (let i = 0; i < n; i++) groups.push({ occupied: [], empty: [] });
+    if (n === 0) {
+      return { groups, unassignedEmpty: beds.filter((b) => !b.occupied).map((b) => b.id) };
+    }
+
+    const occupiedIdx = [];
+    beds.forEach((b, i) => { if (b.occupied) occupiedIdx.push(i); });
+    const sizes = evenSizes(occupiedIdx.length, n);
+
+    // owner[i] = group index owning bed i (occupied beds only for now)
+    const owner = new Array(beds.length).fill(-1);
+    let k = 0;
+    sizes.forEach((size, g) => {
+      for (let j = 0; j < size; j++) owner[occupiedIdx[k++]] = g;
+    });
+
+    // Empty beds: belong to the group of the nearest occupied bed before them
+    // in the list; leading empties go to the first group that has any beds.
+    const firstGroupWithBeds = sizes.findIndex((s) => s > 0);
+    let current = firstGroupWithBeds >= 0 ? firstGroupWithBeds : 0;
+    beds.forEach((b, i) => {
+      if (b.occupied) {
+        current = owner[i];
+        groups[current].occupied.push(b.id);
+      } else {
+        groups[current].empty.push(b.id);
+      }
+    });
+
+    // If nobody has occupied beds (census of zero), spread empties evenly instead.
+    if (occupiedIdx.length === 0) {
+      groups.forEach((g) => { g.empty = []; });
+      const emptySizes = evenSizes(beds.length, n);
+      let e = 0;
+      emptySizes.forEach((size, g) => {
+        for (let j = 0; j < size; j++) groups[g].empty.push(beds[e++].id);
+      });
+    }
+
+    return { groups, unassignedEmpty: [] };
+  }
+
+
+  /**
+   * Turn free text into bed ids. Accepts commas or newlines, and ranges like
+   * "1-20" or "A1-A12" (same prefix, numeric suffix).
+   */
+  function parseBedList(text) {
+    const out = [];
+    const parts = String(text).split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+    for (const part of parts) {
+      const m = part.match(/^(.*?)(\d+)\s*-\s*(\1)?(\d+)$/);
+      if (m) {
+        const prefix = m[1];
+        const a = parseInt(m[2], 10);
+        const b = parseInt(m[4], 10);
+        const width = m[2].length === m[4].length && m[2].startsWith('0') ? m[2].length : 0;
+        const step = a <= b ? 1 : -1;
+        if (Math.abs(b - a) > 2000) { out.push(part); continue; }
+        for (let x = a; step > 0 ? x <= b : x >= b; x += step) {
+          out.push(prefix + String(x).padStart(width, '0'));
+        }
+      } else {
+        out.push(part);
+      }
+    }
+    // de-duplicate, keep first occurrence
+    return out.filter((id, i) => out.indexOf(id) === i);
+  }
+
+  /**
+   * Read the room layout from rooms.json. Each room is
+   *   { "room": "12", "beds": 2 }            -> beds A, B
+   *   { "room": "12", "beds": ["A","B","W"] } -> custom bed labels
+   * Throws an Error with a plain-English message if something is off.
+   */
+  function parseLayout(data) {
+    const list = data && Array.isArray(data.rooms) ? data.rooms : null;
+    if (!list || !list.length) throw new Error('The file needs a "rooms" list with at least one room.');
+    const seen = new Set();
+    return list.map((r, i) => {
+      const name = r && r.room != null ? String(r.room).trim() : '';
+      if (!name) throw new Error(`Room number ${i + 1} in the list has no "room" name.`);
+      if (seen.has(name)) throw new Error(`Room ${name} is listed twice.`);
+      seen.add(name);
+      let labels;
+      if (Array.isArray(r.beds)) labels = r.beds.map((b) => String(b).trim()).filter(Boolean);
+      else {
+        const n = Number(r.beds);
+        if (!Number.isInteger(n) || n < 1 || n > 26) throw new Error(`Room ${name}: "beds" should be a number like 2 or 3.`);
+        labels = Array.from({ length: n }, (_, j) => String.fromCharCode(65 + j));
+      }
+      if (!labels.length) throw new Error(`Room ${name} has no beds.`);
+      if (new Set(labels).size !== labels.length) throw new Error(`Room ${name} has two beds with the same label.`);
+      return { name, beds: labels };
+    });
+  }
+
+  const api = { evenSizes, divideBeds, parseBedList, parseLayout };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.Divider = api;
+})(typeof self !== 'undefined' ? self : this);
+  </script>
+  <script>
+(function () {
+  const { divideBeds } = window.Divider;
+  const { parseLayout } = window.Divider;
+  const STORE = 'bed-divider:v6';
+  // Used only if rooms.json can't be loaded (for example when this page is
+  // opened straight from a file instead of from the website).
+  const FALLBACK_LAYOUT = { rooms: [{ room: "1", beds: 2 }, { room: "2", beds: 2 }, { room: "3", beds: 2 }, { room: "4", beds: 2 }, { room: "5", beds: 2 }, { room: "6", beds: 2 }, { room: "7", beds: 2 }, { room: "8", beds: 2 }, { room: "9", beds: 2 }, { room: "10", beds: 2 }, { room: "11", beds: 2 }, { room: "12", beds: 2 }, { room: "14", beds: 2 }, { room: "15", beds: 2 }, { room: "16", beds: 2 }, { room: "17", beds: 2 }, { room: "18", beds: 2 }, { room: "19", beds: 2 }, { room: "20", beds: 2 }, { room: "21", beds: 2 }, { room: "22", beds: 2 }, { room: "23", beds: 2 }, { room: "24", beds: 2 }, { room: "25", beds: 2 }, { room: "26", beds: 2 }, { room: "27", beds: 2 }, { room: "28", beds: 2 }, { room: "29", beds: 2 }, { room: "30", beds: 2 }, { room: "31", beds: 2 }, { room: "32", beds: 2 }, { room: "33", beds: 2 }, { room: "34", beds: 2 }, { room: "35", beds: 2 }, { room: "36", beds: 2 }, { room: "37", beds: 2 }, { room: "38", beds: 2 }] };
+  // Distinct colors that keep white text readable.
+  const COLORS = ['#1f6feb', '#d1453b', '#1a7f37', '#8250df', '#bc4c00', '#0a7d8c', '#bf3989', '#6e7781',
+                  '#9a6700', '#0550ae', '#a40e26', '#116329', '#6639ba', '#953800', '#1b7c83', '#99286e'];
+  const color = (i) => COLORS[i % COLORS.length];
+
+  // Beds default to occupied; we remember which ones were tapped empty.
+  const defaults = () => ({ empty: {}, staffCount: 4, names: [] });
+
+  let state = load();
+  let layout = parseLayout(FALLBACK_LAYOUT);
+
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORE));
+      if (s && typeof s === 'object') return Object.assign(defaults(), s);
+    } catch (e) { /* storage unavailable */ }
+    return defaults();
+  }
+  function save() {
+    try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) { /* ignore */ }
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const grid = $('room-grid');
+  const results = $('results');
+  const countInput = $('staff-count');
+  const namesBox = $('staff-names');
+
+  const staffName = (i) => (state.names[i] || '').trim() || `Worker ${i + 1}`;
+  // Bed ids look like "12A"; the label is the part after the room name.
+  const buildRooms = () => layout.map((r) => ({
+    name: r.name,
+    beds: r.beds.map((label) => {
+      const id = r.name + label;
+      return { id, label, occupied: !state.empty[id] };
+    }),
+  }));
+
+  function setStaffCount(n) {
+    n = Math.max(1, Math.min(50, Math.floor(Number(n) || 1)));
+    state.staffCount = n;
+    countInput.value = n;
+    renderNames();
+    update();
+  }
+
+  function renderNames() {
+    if (namesBox.querySelectorAll('input').length === state.staffCount) return;
+    namesBox.innerHTML = '';
+    for (let i = 0; i < state.staffCount; i++) {
+      const label = document.createElement('label');
+      const sw = document.createElement('span');
+      sw.className = 'swatch';
+      sw.style.background = color(i);
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = `Worker ${i + 1}`;
+      input.value = state.names[i] || '';
+      input.setAttribute('aria-label', `Name for worker ${i + 1}`);
+      input.addEventListener('input', () => { state.names[i] = input.value; update(); });
+      label.append(sw, input);
+      namesBox.append(label);
+    }
+  }
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function update() {
+    const rooms = buildRooms();
+    const allBeds = rooms.flatMap((r) => r.beds);
+    // Split only the occupied beds, in order, regardless of room.
+    const { groups } = divideBeds(allBeds, state.staffCount);
+
+    // Room grid
+    grid.innerHTML = '';
+    for (const room of rooms) {
+      const box = el('div', 'room');
+
+      box.append(el('div', 'room-name', room.name));
+
+      const bedsRow = el('div', 'beds-row');
+      for (const b of room.beds) {
+        const btn = el('button', 'bed ' + (b.occupied ? 'occupied' : 'empty'));
+        btn.type = 'button';
+        btn.setAttribute('aria-pressed', String(b.occupied));
+        btn.setAttribute('aria-label', `Room ${room.name} bed ${b.label}, ${b.occupied ? 'occupied' : 'empty'}`);
+        btn.textContent = b.label;
+        btn.addEventListener('click', () => {
+          if (state.empty[b.id]) delete state.empty[b.id]; else state.empty[b.id] = true;
+          update();
+        });
+        bedsRow.append(btn);
+      }
+      box.append(bedsRow);
+      grid.append(box);
+    }
+
+    const occCount = allBeds.filter((b) => b.occupied).length;
+    $('census').textContent = `${occCount} of ${allBeds.length} beds occupied in ${rooms.length} rooms.`;
+
+    // Assignment list: one line per worker with their bed range.
+    const bedOrder = allBeds.map((x) => x.id);
+    results.innerHTML = '';
+    groups.forEach((g, i) => {
+      const li = el('li');
+      li.style.borderLeftColor = color(i);
+      const who = el('div', 'who');
+      who.append(el('span', null, staffName(i)),
+                 el('span', 'count', `${g.occupied.length} patient${g.occupied.length === 1 ? '' : 's'}`));
+      li.append(who);
+      const occ = g.occupied;
+      if (!occ.length) {
+        li.append(el('p', 'range', 'No patients'));
+      } else {
+        const first = occ[0], last = occ[occ.length - 1];
+        li.append(el('p', 'range', first === last ? `Bed ${first}` : `Beds ${first} – ${last}`));
+        const a = bedOrder.indexOf(first), b = bedOrder.indexOf(last);
+        const skipped = bedOrder.slice(a, b + 1).filter((id) => !occ.includes(id));
+        if (skipped.length) li.append(el('p', 'open', `Skip (empty): ${skipped.join(', ')}`));
+      }
+      results.append(li);
+    });
+
+    save();
+  }
+
+  // Load the room layout from rooms.json next to this page. If that fails
+  // (no file, a typo in it, or the page was opened from disk), fall back to
+  // the built-in layout and say so.
+  function showNote(text, isError) {
+    const note = $('layout-note');
+    note.hidden = !text;
+    note.textContent = text || '';
+    note.classList.toggle('error', !!isError);
+  }
+  async function loadLayout() {
+    if (location.protocol === 'file:') {
+      showNote('Opened from a file, so the built-in room list is being used. On the website, rooms come from rooms.json.');
+      return;
+    }
+    try {
+      const res = await fetch('rooms.json', { cache: 'no-cache' });
+      if (!res.ok) throw new Error(`rooms.json could not be loaded (error ${res.status}).`);
+      let data;
+      try { data = await res.json(); } catch (e) { throw new Error('rooms.json has a formatting mistake (check for a missing comma or quote).'); }
+      layout = parseLayout(data);
+      showNote('');
+    } catch (e) {
+      showNote(`${e.message} Showing the built-in room list instead.`, true);
+    }
+    update();
+  }
+
+  $('all-occ').addEventListener('click', () => { state.empty = {}; update(); });
+
+
+  countInput.addEventListener('change', () => setStaffCount(countInput.value));
+  $('staff-minus').addEventListener('click', () => setStaffCount(state.staffCount - 1));
+  $('staff-plus').addEventListener('click', () => setStaffCount(state.staffCount + 1));
+  $('print').addEventListener('click', () => window.print());
+  $('reset').addEventListener('click', () => {
+    if (!confirm('Mark every bed occupied again and clear worker names?')) return;
+    state = defaults();
+    namesBox.innerHTML = '';
+    setStaffCount(state.staffCount);
+  });
+
+  setStaffCount(state.staffCount);
+  loadLayout();
+})();
+  </script>
+</body>
+</html>
