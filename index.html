@@ -214,6 +214,8 @@ textarea, input[type=text], input[type=number] {
 .assign-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .assign-list li { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
 .assign-list .who { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 650; }
+.assign-list .right-meta { display: flex; flex-direction: column; align-items: flex-end; text-align: right; line-height: 1.25; }
+.assign-list .assign-num { color: var(--accent); font-weight: 700; font-size: 0.9rem; white-space: nowrap; }
 .assign-list .count { color: var(--muted); font-weight: 500; white-space: nowrap; }
 .assign-list .range { font-size: 1.3rem; font-weight: 700; margin: 2px 0 0; padding-left: 11px; }
 .assign-list .rooms, .assign-list .open { color: var(--muted); font-size: 0.9rem; margin: 2px 0 0; padding-left: 11px; }
@@ -282,7 +284,8 @@ textarea, input[type=text], input[type=number] {
     break-inside: avoid;
     page-break-inside: avoid;
   }
-  .assign-list .who { display: contents; }
+  .assign-list .who, .assign-list .right-meta { display: contents; }
+  .assign-list .assign-num { display: none !important; }
   .worker-wrap { grid-column: 1; grid-row: 1; }
   .worker-pick {
     border: none;
@@ -954,8 +957,12 @@ textarea, input[type=text], input[type=number] {
         wrap.append(tag);
       }
 
-      who.append(wrap,
-                 el('span', 'count', `${g.occupied.length} patient${g.occupied.length === 1 ? '' : 's'}`));
+      const rightMeta = el('div', 'right-meta');
+      rightMeta.append(
+        el('span', 'assign-num', `Assignment ${i + 1}`),
+        el('span', 'count', `${g.occupied.length} patient${g.occupied.length === 1 ? '' : 's'}`)
+      );
+      who.append(wrap, rightMeta);
       li.append(who);
       const occ = g.occupied;
       if (!occ.length) {
