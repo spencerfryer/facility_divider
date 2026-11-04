@@ -149,9 +149,14 @@ textarea, input[type=text], input[type=number] {
 .sync.error { color: var(--error); }
 .room-line { display: flex; align-items: center; gap: 8px; }
 .room-line .room { flex: 1; min-width: 0; }
-.beds-row .bed.add-bed { border: 2px dashed var(--accent); color: var(--accent); font-size: 1.5rem; font-weight: 500; }
-.remove-bed { flex: none; width: 44px; min-height: 44px; padding: 0; font-size: 1.4rem; line-height: 1; background: transparent; color: var(--text); border-color: var(--border); }
+/* + and − are squares 75% as wide as a bed (--tool-size is measured in JS). */
+.beds-row .bed.add-bed, .remove-bed {
+  flex: 0 0 var(--tool-size, 40px); width: var(--tool-size, 40px); height: var(--tool-size, 40px); min-height: 0;
+  align-self: center; padding: 0; border: 2px solid var(--accent); border-radius: 8px;
+  background: transparent; color: var(--accent); font-size: 1.4rem; font-weight: 500; line-height: 1;
+}
 .remove-bed:disabled { opacity: 0.35; cursor: default; }
+.beds-row .bed.add-bed { margin-left: calc((var(--bed-size, 53px) - var(--tool-size, 40px)) / 2); }
 #edit-toggle[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .layout-note.error { color: var(--error); border: 1px solid var(--error); }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 0.9rem; color: var(--muted); margin: 8px 0; }
@@ -497,6 +502,8 @@ textarea, input[type=text], input[type=number] {
       grid.append(line);
     }
 
+    if (editing) sizeTools();
+
     const occCount = allBeds.filter((b) => b.occupied).length;
     $('census').textContent = `${occCount} of ${allBeds.length} beds occupied in ${rooms.length} rooms.`;
 
@@ -656,6 +663,16 @@ textarea, input[type=text], input[type=number] {
     update();
     if (pending.length) flush();
   }
+
+  // Size the + and − squares to 75% of a bed's width.
+  function sizeTools() {
+    const bed = grid.querySelector('.beds-row .bed:not(.add-bed)');
+    if (!bed) return;
+    const w = bed.getBoundingClientRect().width;
+    grid.style.setProperty('--bed-size', `${w}px`);
+    grid.style.setProperty('--tool-size', `${Math.round(w * 0.75)}px`);
+  }
+  window.addEventListener('resize', () => { if (editing) sizeTools(); });
 
   function changeBeds(roomName, delta) {
     const r = layout.find((x) => x.name === roomName);
