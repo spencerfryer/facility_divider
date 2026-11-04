@@ -1020,15 +1020,31 @@ textarea, input[type=text], input[type=number] {
   }
   function forgetCode() { try { localStorage.removeItem(CODE_KEY); } catch (e) { /* ignore */ } }
 
+  const SAVE_DELAY_MS = 2000;
+
   function queue(op) {
+    // Coalesce repeated changes to the same bed or shift worker count during the 2s pause.
+    if (op.op === 'setOccupied') {
+      const prev = pending.findIndex((p) => p.op === 'setOccupied' && p.room === op.room && p.bed === op.bed);
+      if (prev !== -1) pending.splice(prev, 1);
+    } else if (op.op === 'setWorkers') {
+      const prev = pending.findIndex((p) => p.op === 'setWorkers' && p.shift === op.shift);
+      if (prev !== -1) pending.splice(prev, 1);
+    } else if (op.op === 'setAll') {
+      for (let i = pending.length - 1; i >= 0; i--) {
+        if (pending[i].op === 'setOccupied' || pending[i].op === 'setAll') pending.splice(i, 1);
+      }
+    }
     pending.push(op);
     clearTimeout(flushTimer);
-    flushTimer = setTimeout(flush, 400);
+    flushTimer = setTimeout(() => { flushTimer = null; flush(); }, SAVE_DELAY_MS);
   }
 
   // Sends queued changes; resolves true if they were saved.
   async function flush() {
     if (saving || !pending.length) return false;
+    clearTimeout(flushTimer);
+    flushTimer = null;
     let ok = false;
     const code = getCode(true);
     if (!code) {
@@ -1066,7 +1082,9 @@ textarea, input[type=text], input[type=number] {
       await loadShared(true);
     }
     update();
-    if (pending.length) return (await flush()) && ok;
+    if (pending.length && !flushTimer) {
+      flushTimer = setTimeout(() => { flushTimer = null; flush(); }, SAVE_DELAY_MS);
+    }
     return ok;
   }
 
