@@ -84,13 +84,9 @@ test('worker counts are saved per shift', () => {
   assert.throws(() => applyOps(s, [{ op: 'setWorkers', shift: 'LATE', workers: 2 }]), /no shift LATE/);
 });
 
-test('finalize keeps the newest 7 per shift', () => {
-  let s = seed();
-  for (let i = 1; i <= 9; i++) s = applyOps(s, [{ op: 'finalize', shift: 'AM', counts: [i, i], ranges: ['1A – 1B', '2A – 2C'] }]);
-  assert.strictEqual(s.shifts.AM.history.length, 7);
-  assert.deepStrictEqual(s.shifts.AM.history.map((h) => h.counts[0]), [9, 8, 7, 6, 5, 4, 3]);
-  assert.deepStrictEqual(s.shifts.AM.history[0].ranges, ['1A – 1B', '2A – 2C']);
-  assert.strictEqual(s.shifts.PM.history.length, 0);
+test('finalize validates patient counts and does not store history', () => {
+  const s = applyOps(seed(), [{ op: 'finalize', shift: 'AM', counts: [4, 3] }]);
+  assert.strictEqual(s.shifts.AM.history, undefined);
   assert.throws(() => applyOps(s, [{ op: 'finalize', shift: 'AM', counts: [] }]), /patient counts/);
   assert.throws(() => applyOps(s, [{ op: 'finalize', shift: 'AM', counts: [1.5] }]), /patient counts/);
 });

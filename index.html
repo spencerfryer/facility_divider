@@ -201,18 +201,12 @@ textarea, input[type=text], input[type=number] {
 .tabs [role=tab][aria-selected="true"] { color: var(--accent-text); background: var(--tab-active); border-color: var(--tab-active); }
 .shift-bar { justify-content: flex-start; }
 .shift-bar .actions { display: flex; gap: 8px; margin-left: auto; }
-.history { margin-top: 20px; }
-.history h3 { font-size: 1rem; margin: 0 0 8px; }
-.history-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.history-list li { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
-.history-list .when { font-weight: 650; }
-.history-list .counts { color: var(--muted); font-variant-numeric: tabular-nums; }
 .print-only { display: none; }
 .tag { font-size: 0.75rem; font-weight: 500; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; white-space: nowrap; }
 
 @media print {
   body { background: #fff; color: #000; }
-  .top .sub, .row, .hint, .worker-menu, .worker-pick .caret, .tabs, .history, #finalize-status, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type { display: none !important; }
+  .top .sub, .row, .hint, .worker-menu, .worker-pick .caret, .tabs, #finalize-status, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type { display: none !important; }
   .worker-pick { border: none; background: none; color: #000; padding: 0; min-height: 0; }
   .panel { border: none; padding: 0; margin: 8px 0; }
   .panel > h2 { display: none; }
@@ -268,17 +262,12 @@ textarea, input[type=text], input[type=number] {
         <p class="sync" id="finalize-status" hidden></p>
         <p class="hint">Click on worker name to assign or change worker</p>
         <ol id="results" class="assign-list" aria-live="polite"></ol>
-        <div class="history">
-          <h3 id="history-h">Last 7 finalized</h3>
-          <p class="hint" id="history-empty">Nothing finalized for this shift yet.</p>
-          <ol id="history" class="history-list" aria-labelledby="history-h"></ol>
-        </div>
       </div>
     </section>
   </main>
 
   <footer class="foot">
-    <p>Rooms, beds, worker assignments and finalized history are shared through the passcode-protected bed list. <button type="button" class="link" id="reset">Reset everything</button></p>
+    <p>Rooms, beds, and worker assignments are shared through the passcode-protected bed list. <button type="button" class="link" id="reset">Reset everything</button></p>
   </footer>
 
   <script id="divide-logic">
@@ -569,7 +558,6 @@ textarea, input[type=text], input[type=number] {
 
   // Beds default to occupied; we remember which ones were tapped empty.
   const SHIFTS = ['AM', 'PM', 'NOC'];
-  const HISTORY_LENGTH = 7;
   let allWorkers = parseWorkers(FALLBACK_WORKERS);
   const shiftDefaultIds = (shiftName, count) => {
     const first = allWorkers.filter((w) => w.shift === shiftName);
@@ -579,7 +567,6 @@ textarea, input[type=text], input[type=number] {
   const newShifts = () => Object.fromEntries(SHIFTS.map((n) => [n, {
     workers: 4,
     ids: shiftDefaultIds(n, 4),
-    history: [],
     extras: [],
   }]));
   const defaults = () => ({ empty: {}, tab: 'AM', workers: allWorkers.map((w) => ({ ...w })), shifts: newShifts() });
@@ -664,7 +651,6 @@ textarea, input[type=text], input[type=number] {
   const local = () => state.shifts[tab()];
   const sharedShift = () => (shared.on && shared.shifts ? shared.shifts[tab()] : null);
   const workers = () => (sharedShift() || local()).workers;
-  const history = () => (sharedShift() || local()).history;
   const assignedIds = () => {
     local().workers = workers();
     syncShiftIds(local(), tab());
@@ -682,7 +668,7 @@ textarea, input[type=text], input[type=number] {
     const ids = assignedIds();
     return Array.from({ length: workers() }, (_, i) => !!byId.get(ids[i]));
   };
-  let lastGroups = [];
+  let lastCounts = [];
   // Bed ids look like "12A"; the label is the part after the room name.
   const emptyMap = () => (shared.on ? shared.empty : state.empty);
   const buildRooms = () => layout.map((r) => ({
@@ -802,12 +788,7 @@ textarea, input[type=text], input[type=number] {
 
     // Assignment list: one line per worker with their bed range.
     const bedOrder = allBeds.map((x) => x.id);
-    lastGroups = groups.map((g) => {
-      const occ = g.occupied;
-      if (!occ.length) return { count: 0, range: '' };
-      const first = occ[0], last = occ[occ.length - 1];
-      return { count: occ.length, range: first === last ? first : `${first} – ${last}` };
-    });
+    lastCounts = groups.map((g) => g.occupied.length);
     results.innerHTML = '';
     const pool = workerPool();
     const currentIds = assignedIds().slice(0, workers());
@@ -886,26 +867,7 @@ textarea, input[type=text], input[type=number] {
       results.append(li);
     });
 
-    renderHistory();
     save();
-  }
-
-  function renderHistory() {
-    const list = $('history');
-    const items = history();
-    list.innerHTML = '';
-    $('history-empty').hidden = items.length > 0;
-    for (const h of items) {
-      const li = el('li');
-      const when = new Date(h.at);
-      const label = isNaN(when) ? 'Unknown time'
-        : when.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-      li.append(el('span', 'when', label));
-      const total = h.counts.reduce((a, b) => a + b, 0);
-      li.append(el('span', 'counts', `${h.counts.length} worker${h.counts.length === 1 ? '' : 's'}: ${h.counts.join(' / ')} patients (${total} total)`));
-      li.title = h.ranges.filter(Boolean).map((r, i) => `Worker ${i + 1}: ${r}`).join('\n');
-      list.append(li);
-    }
   }
 
   function setFinalizeStatus(text, isError) {
@@ -915,30 +877,24 @@ textarea, input[type=text], input[type=number] {
     s.classList.toggle('error', !!isError);
   }
 
-  // Record how many patients each worker in the open tab has, keeping the
-  // newest HISTORY_LENGTH records for that shift.
+  // Record who received an extra patient on the open shift.
   async function finalize() {
-    const counts = lastGroups.map((g) => g.count);
-    const ranges = lastGroups.map((g) => g.range);
+    const counts = lastCounts.slice();
     const shift = tab();
     const ids = Array.from({ length: counts.length }, (_, i) => staffId(i));
     const names = Array.from({ length: counts.length }, (_, i) => staffName(i));
     if (!confirm(`Finalize ${shift}? This records ${counts.join(' / ')} patients for ${names.join(', ')}.`)) return;
-    const entry = { at: new Date().toISOString(), counts, ranges };
     const t = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     state.workers = nextWorkerExtras(workerPool(), shift, ids, counts);
     state.shifts[shift].extras = nextFlags(state.shifts[shift].extras, counts);
     if (sharedShift()) {
       shared.workers = state.workers.map((w) => ({ ...w }));
-      queue({ op: 'finalize', shift, counts, ranges, workerIds: ids });
+      queue({ op: 'finalize', shift, counts, workerIds: ids });
       clearTimeout(flushTimer);
       const ok = await flush();
       setFinalizeStatus(ok ? `${shift} finalized at ${t}.` : `${shift} was not finalized. Check the message above and try again.`, !ok);
       return;
     }
-    const h = state.shifts[shift].history;
-    h.unshift(entry);
-    h.length = Math.min(h.length, HISTORY_LENGTH);
     setFinalizeStatus(`${shift} finalized at ${t} (saved on this device).`);
     update();
   }
@@ -1025,7 +981,6 @@ textarea, input[type=text], input[type=number] {
       workers: workerPool().map((w) => ({ id: w.id, name: w.name, shift: w.shift, extra: !!w.extra })),
       shifts: Object.fromEntries(SHIFTS.map((n) => [n, {
         workers: state.shifts[n].workers,
-        history: state.shifts[n].history,
         extras: state.shifts[n].extras,
       }])),
     };
@@ -1211,11 +1166,10 @@ textarea, input[type=text], input[type=number] {
     const keepWorkers = state.workers;
     state = defaults();
     state.workers = keepWorkers;
-    // Worker counts, finalized history and worker extra status are kept.
+    // Worker counts and worker extra status are kept.
     for (const n of SHIFTS) {
       Object.assign(state.shifts[n], {
         workers: keep[n].workers,
-        history: keep[n].history,
         extras: keep[n].extras,
       });
       syncShiftIds(state.shifts[n], n);

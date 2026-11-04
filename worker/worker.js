@@ -15,10 +15,9 @@
  *       ...
  *     ],
  *     "shifts": {
- *       "AM":  { "workers": 4, "extras": [true, false, false, false], "history": [
- *                  { "at": "2026-11-04T07:05:00Z", "counts": [13, 13, 12], "ranges": ["1A – 9A", ...] } ] },
- *       "PM":  { "workers": 3, "extras": [], "history": [] },
- *       "NOC": { "workers": 2, "extras": [], "history": [] }
+ *       "AM":  { "workers": 4, "extras": [true, false, false, false] },
+ *       "PM":  { "workers": 3, "extras": [] },
+ *       "NOC": { "workers": 2, "extras": [] }
  *     }
  *   }
  *
@@ -35,7 +34,6 @@
 export const MAX_BEDS = 3;
 export const SHIFTS = ['AM', 'PM', 'NOC'];
 export const WORKER_GROUPS = ['AM', 'PM', 'NOC', 'On Call'];
-export const HISTORY_LENGTH = 7;
 const MAX_WORKERS = 50;
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const KEY = 'state';
@@ -152,11 +150,6 @@ export function cleanState(s) {
     shifts[name] = {
       workers: clampWorkers(sh.workers ?? 4),
       extras: Array.isArray(sh.extras) ? sh.extras.slice(0, MAX_WORKERS).map(Boolean) : [],
-      history: Array.isArray(sh.history) ? sh.history.slice(0, HISTORY_LENGTH).map((h) => ({
-        at: String(h.at || ''),
-        counts: Array.isArray(h.counts) ? h.counts.map((c) => Math.max(0, Math.floor(Number(c)) || 0)) : [],
-        ranges: Array.isArray(h.ranges) ? h.ranges.map((r) => String(r).slice(0, 40)) : [],
-      })) : [],
     };
   }
   return {
@@ -175,7 +168,7 @@ export function cleanState(s) {
  *   { op: "removeBed", room: "12" }    removes the room's last bed, keeps at least one
  *   { op: "setAll", occupied: true }   marks every bed occupied (or empty)
  *   { op: "setWorkers", shift: "AM", workers: 4 }
- *   { op: "finalize", shift: "AM", counts: [13, 13, 12], ranges: ["1A – 9A", ...], workerIds: ["am1", ...] }
+ *   { op: "finalize", shift: "AM", counts: [13, 13, 12], workerIds: ["am1", ...] }
  */
 export function applyOps(state, ops) {
   if (!Array.isArray(ops) || ops.length > 200) throw new Error('"ops" must be a list of up to 200 changes');
@@ -221,10 +214,6 @@ export function applyOps(state, ops) {
             || !o.counts.every((c) => Number.isInteger(c) && c >= 0 && c <= 10000)) {
           throw new Error('finalize needs a list of patient counts');
         }
-        const ranges = Array.isArray(o.ranges) ? o.ranges.slice(0, o.counts.length).map((r) => String(r).slice(0, 40)) : [];
-        const h = s.shifts[o.shift].history;
-        h.unshift({ at: new Date().toISOString(), counts: o.counts, ranges });
-        h.length = Math.min(h.length, HISTORY_LENGTH);
         s.shifts[o.shift].extras = nextFlags(s.shifts[o.shift].extras, o.counts);
         if (s.workers.length && Array.isArray(o.workerIds)) {
           s.workers = nextWorkerExtras(s.workers, o.shift, o.workerIds, o.counts);
