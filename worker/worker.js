@@ -24,7 +24,7 @@
  *   PASSCODE  secret: the code staff type to make changes
  */
 
-export const MAX_BEDS = 4;
+export const MAX_BEDS = 3;
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const KEY = 'state';
 

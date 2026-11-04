@@ -32,9 +32,9 @@ test('applyOps toggles, adds and removes beds', () => {
 });
 
 test(`rooms are limited to 1..${MAX_BEDS} beds`, () => {
-  assert.throws(() => applyOps(seed(), [{ op: 'addBed', room: '2' }, { op: 'addBed', room: '2' }]), /already has 4 beds/);
+  assert.throws(() => applyOps(seed(), [{ op: 'addBed', room: '2' }]), /already has 3 beds/);
   assert.throws(() => applyOps(seed(), [{ op: 'removeBed', room: '1' }, { op: 'removeBed', room: '1' }]), /at least one bed/);
-  assert.throws(() => validateState({ rooms: [{ room: '1', beds: [] }] }), /1 to 4 beds/);
+  assert.throws(() => validateState({ rooms: [{ room: '1', beds: [] }] }), /1 to 3 beds/);
 });
 
 test('GET /state is empty until the first save', async () => {
