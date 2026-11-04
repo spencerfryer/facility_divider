@@ -24,7 +24,7 @@
   --on-orange: #241300;
   --bed-line: #4a5360;
   --error: #ff7b72;
-  --tool: #7999d2; /* accent blue at half saturation, for the + and − buttons */
+  --tool: #8f9fbc; /* accent blue at a quarter saturation, for the + and − buttons */
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -125,10 +125,10 @@ textarea, input[type=text], input[type=number] {
   background: none; border: none; color: var(--text); padding: 0; min-height: 0;
   font-weight: 700; font-size: 1.25rem; cursor: default;
 }
-.beds-row { display: flex; gap: 8px; flex: 1; min-width: 0; }
+.beds-row { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 /* Every bed is the width it would have in the fullest room, left-aligned. */
 .beds-row .bed {
-  flex: 0 0 calc((100% - (var(--max-beds) - 1) * 8px) / var(--max-beds)); min-width: 0; overflow: hidden; text-overflow: ellipsis; min-height: 52px; padding: 0; border-radius: 8px;
+  flex: 0 0 calc((100% - (var(--max-beds) - 1) * 8px) / var(--max-beds)); min-width: 0; overflow: hidden; text-overflow: ellipsis; height: 52px; min-height: 52px; padding: 0; border-radius: 8px;
   border: 2px solid var(--bed-line); background: transparent; color: var(--empty-text);
   font-weight: 700; font-size: 1rem;
 }
@@ -164,10 +164,30 @@ textarea, input[type=text], input[type=number] {
 .check input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
 .card .span { margin: 0; font-size: 0.9rem; color: var(--muted); }
 
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 12px 0 12px; }
+.tabs [role=tab] {
+  background: transparent; color: var(--muted); border: 1px solid transparent; border-bottom: none;
+  border-radius: 8px 8px 0 0; min-width: 72px; font-weight: 650; margin-bottom: -1px;
+}
+.tabs [role=tab][aria-selected="true"] { color: var(--text); background: var(--bg); border-color: var(--border); border-bottom: 1px solid var(--bg); }
+.shift-bar { justify-content: flex-start; }
+.shift-bar .actions { display: flex; gap: 8px; margin-left: auto; }
+.history { margin-top: 20px; }
+.history h3 { font-size: 1rem; margin: 0 0 8px; }
+.history-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.history-list li { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.history-list .when { font-weight: 650; }
+.history-list .counts { color: var(--muted); font-variant-numeric: tabular-nums; }
+.print-only { display: none; }
+.tag { font-size: 0.75rem; font-weight: 500; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; white-space: nowrap; }
+
 @media print {
   body { background: #fff; color: #000; }
-  .top .sub, .row, .hint, .names, #print, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type { display: none !important; }
+  .top .sub, .row, .hint, .names, .tabs, .history, #finalize-status, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type { display: none !important; }
   .panel { border: none; padding: 0; margin: 8px 0; }
+  .panel > h2 { display: none; }
+  .print-only { display: block; margin: 0 0 8px; }
+  .tag { display: none; }
   .bed, .card, .assign-list li { -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; }
 }
   </style>
@@ -195,33 +215,44 @@ textarea, input[type=text], input[type=number] {
       <div id="room-grid" class="room-grid" role="group" aria-label="Rooms"></div>
     </section>
 
-    <section class="panel" aria-labelledby="staff-h">
-      <h2 id="staff-h">2. Workers</h2>
-      <div class="row">
-        <label for="staff-count" class="inline">Number of workers</label>
-        <div class="stepper">
-          <button type="button" id="staff-minus" aria-label="One fewer">−</button>
-          <input id="staff-count" type="number" min="1" max="50" value="4" inputmode="numeric">
-          <button type="button" id="staff-plus" aria-label="One more">+</button>
+    <section class="panel" aria-labelledby="result-h">
+      <h2 id="result-h">2. Assignments</h2>
+      <div class="tabs" role="tablist" aria-label="Shift">
+        <button type="button" role="tab" id="tab-AM" data-shift="AM" aria-controls="shift-panel">AM</button>
+        <button type="button" role="tab" id="tab-PM" data-shift="PM" aria-controls="shift-panel">PM</button>
+        <button type="button" role="tab" id="tab-NOC" data-shift="NOC" aria-controls="shift-panel">NOC</button>
+      </div>
+      <div id="shift-panel" role="tabpanel" aria-labelledby="tab-AM">
+        <h3 class="print-only" id="print-shift"></h3>
+        <div class="row shift-bar">
+          <label for="staff-count" class="inline">Number of workers</label>
+          <div class="stepper">
+            <button type="button" id="staff-minus" aria-label="One fewer">−</button>
+            <input id="staff-count" type="number" min="1" max="50" value="4" inputmode="numeric">
+            <button type="button" id="staff-plus" aria-label="One more">+</button>
+          </div>
+          <div class="actions">
+            <button type="button" class="ghost" id="print">Print</button>
+            <button type="button" id="finalize">Finalize</button>
+          </div>
+        </div>
+        <p class="sync" id="finalize-status" hidden></p>
+        <details class="names">
+          <summary>Add worker names (optional)</summary>
+          <div id="staff-names" class="staff-names"></div>
+        </details>
+        <ol id="results" class="assign-list" aria-live="polite"></ol>
+        <div class="history">
+          <h3 id="history-h">Last 7 finalized</h3>
+          <p class="hint" id="history-empty">Nothing finalized for this shift yet.</p>
+          <ol id="history" class="history-list" aria-labelledby="history-h"></ol>
         </div>
       </div>
-      <details class="names">
-        <summary>Add worker names (optional)</summary>
-        <div id="staff-names" class="staff-names"></div>
-      </details>
-    </section>
-
-    <section class="panel" aria-labelledby="result-h">
-      <div class="panel-head">
-        <h2 id="result-h">3. Assignments</h2>
-        <button type="button" class="ghost" id="print">Print</button>
-      </div>
-      <ol id="results" class="assign-list" aria-live="polite"></ol>
     </section>
   </main>
 
   <footer class="foot">
-    <p>Runs entirely in your browser. Nothing is sent anywhere; your layout and names are saved on this device only. <button type="button" class="link" id="reset">Reset everything</button></p>
+    <p>Rooms, beds, worker counts and finalized history are shared through the passcode-protected bed list. Worker names stay on this device only. <button type="button" class="link" id="reset">Reset everything</button></p>
   </footer>
 
   <script id="divide-logic">
@@ -235,25 +266,63 @@ textarea, input[type=text], input[type=number] {
  * person also knows which open beds (admissions) are "theirs".
  */
 (function (root) {
+  /** `flags` cut or padded (with false) to `n` workers. */
+  function fitFlags(flags, n) {
+    const f = [];
+    for (let i = 0; i < n; i++) f.push(!!(flags && flags[i]));
+    return f;
+  }
+
+  /**
+   * Which of `n` workers get one of `extra` extra patients. Workers flagged
+   * as having already had an extra this round are skipped until everyone has
+   * had one; if there are more extras than unflagged workers, the rest go to
+   * flagged workers in order. With no flags, the first workers get them.
+   */
+  function pickExtras(extra, n, flags) {
+    let f = fitFlags(flags, n);
+    if (f.every(Boolean)) f = f.map(() => false);
+    const fresh = [], had = [];
+    f.forEach((x, i) => (x ? had : fresh).push(i));
+    const chosen = new Set(fresh.concat(had).slice(0, extra));
+    return f.map((_, i) => chosen.has(i));
+  }
+
+  /**
+   * Flags after a finalize: workers who got more patients than the fewest
+   * are flagged. Once every worker is flagged the round starts over, keeping
+   * only the workers who got a second extra in this same finalize.
+   */
+  function nextFlags(flags, counts) {
+    const n = counts.length;
+    let f = fitFlags(flags, n);
+    if (f.every(Boolean)) f = f.map(() => false);
+    const min = Math.min(...counts);
+    const got = counts.map((c) => c > min);
+    const after = f.map((x, i) => x || got[i]);
+    if (n && after.every(Boolean)) return f.map((x, i) => x && got[i]);
+    return after;
+  }
+
   /**
    * Sizes of `groups` groups covering `total` items as evenly as possible.
-   * Larger groups come first, e.g. evenSizes(10, 3) -> [4, 3, 3].
+   * Without `flags` larger groups come first, e.g. evenSizes(10, 3) -> [4, 3, 3];
+   * with flags, the extras go to workers who haven't had one this round.
    */
-  function evenSizes(total, groups) {
+  function evenSizes(total, groups, flags) {
     if (groups <= 0) return [];
     const base = Math.floor(total / groups);
-    const extra = total % groups;
-    const sizes = [];
-    for (let i = 0; i < groups; i++) sizes.push(base + (i < extra ? 1 : 0));
-    return sizes;
+    const getsExtra = pickExtras(total % groups, groups, flags);
+    return getsExtra.map((x) => base + (x ? 1 : 0));
   }
 
   /**
    * @param {{id: string, occupied: boolean}[]} beds  beds in layout order
    * @param {number} staffCount
+   * @param {boolean[]} [flags]  workers who already had an extra patient this round
    * @returns {{groups: {occupied: string[], empty: string[]}[], unassignedEmpty: string[]}}
    */
-  function divideBeds(beds, staffCount) {
+  function divideBeds(beds, staffCount, flags) {
     const n = Math.max(0, Math.floor(Number(staffCount) || 0));
     const groups = [];
     for (let i = 0; i < n; i++) groups.push({ occupied: [], empty: [] });
@@ -263,7 +332,7 @@ textarea, input[type=text], input[type=number] {
 
     const occupiedIdx = [];
     beds.forEach((b, i) => { if (b.occupied) occupiedIdx.push(i); });
-    const sizes = evenSizes(occupiedIdx.length, n);
+    const sizes = evenSizes(occupiedIdx.length, n, flags);
 
     // owner[i] = group index owning bed i (occupied beds only for now)
     const owner = new Array(beds.length).fill(-1);
@@ -354,7 +423,7 @@ textarea, input[type=text], input[type=number] {
     });
   }
 
-  const api = { evenSizes, divideBeds, parseBedList, parseLayout };
+  const api = { evenSizes, pickExtras, nextFlags, divideBeds, parseBedList, parseLayout };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Divider = api;
 })(typeof self !== 'undefined' ? self : this);
@@ -362,7 +431,7 @@ textarea, input[type=text], input[type=number] {
   <script>
 (function () {
   const { divideBeds } = window.Divider;
-  const { parseLayout } = window.Divider;
+  const { parseLayout, nextFlags } = window.Divider;
   const STORE = 'bed-divider:v6';
   // Address of the Cloudflare Worker that stores the shared layout and bed
   // states (see worker/README.md). Leave empty to keep everything on this
@@ -379,12 +448,15 @@ textarea, input[type=text], input[type=number] {
   const color = (i) => COLORS[i % COLORS.length];
 
   // Beds default to occupied; we remember which ones were tapped empty.
-  const defaults = () => ({ empty: {}, staffCount: 4, names: [] });
+  const SHIFTS = ['AM', 'PM', 'NOC'];
+  const HISTORY_LENGTH = 7;
+  const newShifts = () => Object.fromEntries(SHIFTS.map((n) => [n, { workers: 4, names: [], history: [], extras: [] }]));
+  const defaults = () => ({ empty: {}, tab: 'AM', shifts: newShifts() });
 
   let state = load();
   let layout = parseLayout(FALLBACK_LAYOUT);
   // Shared mode: the Worker's copy of which beds are empty, keyed by bed id.
-  let shared = { on: false, version: 0, empty: {} };
+  let shared = { on: false, version: 0, empty: {}, shifts: null };
   let editing = false;
   const pending = [];        // changes waiting to be sent to the Worker
   let flushTimer = null;
@@ -393,7 +465,16 @@ textarea, input[type=text], input[type=number] {
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(STORE));
-      if (s && typeof s === 'object') return Object.assign(defaults(), s);
+      if (s && typeof s === 'object') {
+        const out = Object.assign(defaults(), s);
+        out.shifts = newShifts();
+        for (const n of SHIFTS) Object.assign(out.shifts[n], (s.shifts && s.shifts[n]) || {});
+        // Older saves had one worker count and name list: they become the AM shift's.
+        if (!s.shifts && s.staffCount) { out.shifts.AM.workers = s.staffCount; out.shifts.AM.names = s.names || []; }
+        delete out.staffCount; delete out.names;
+        if (!SHIFTS.includes(out.tab)) out.tab = 'AM';
+        return out;
+      }
     } catch (e) { /* storage unavailable */ }
     return defaults();
   }
@@ -407,7 +488,17 @@ textarea, input[type=text], input[type=number] {
   const countInput = $('staff-count');
   const namesBox = $('staff-names');
 
-  const staffName = (i) => (state.names[i] || '').trim() || `Worker ${i + 1}`;
+  // The open tab's settings. Worker counts and history come from the shared
+  // bed list when it's on; names always stay on this device.
+  const tab = () => state.tab;
+  const local = () => state.shifts[tab()];
+  const sharedShift = () => (shared.on && shared.shifts ? shared.shifts[tab()] : null);
+  const workers = () => (sharedShift() || local()).workers;
+  const history = () => (sharedShift() || local()).history;
+  // Worker positions that already had an extra patient this round.
+  const extras = () => (sharedShift() || local()).extras || [];
+  const staffName = (i) => (local().names[i] || '').trim() || `Worker ${i + 1}`;
+  let lastGroups = [];
   // Bed ids look like "12A"; the label is the part after the room name.
   const emptyMap = () => (shared.on ? shared.empty : state.empty);
   const buildRooms = () => layout.map((r) => ({
@@ -420,16 +511,28 @@ textarea, input[type=text], input[type=number] {
 
   function setStaffCount(n) {
     n = Math.max(1, Math.min(50, Math.floor(Number(n) || 1)));
-    state.staffCount = n;
-    countInput.value = n;
-    renderNames();
+    if (n !== workers()) {
+      local().workers = n;
+      if (sharedShift()) { sharedShift().workers = n; queue({ op: 'setWorkers', shift: tab(), workers: n }); }
+    }
+    update();
+  }
+
+  function setTab(name) {
+    if (!SHIFTS.includes(name)) return;
+    state.tab = name;
+    namesBox.innerHTML = '';
+    setFinalizeStatus('');
     update();
   }
 
   function renderNames() {
-    if (namesBox.querySelectorAll('input').length === state.staffCount) return;
+    const n = workers();
+    if (namesBox.dataset.shift === tab() && namesBox.querySelectorAll('input').length === n) return;
+    namesBox.dataset.shift = tab();
+    const names = local().names;
     namesBox.innerHTML = '';
-    for (let i = 0; i < state.staffCount; i++) {
+    for (let i = 0; i < n; i++) {
       const label = document.createElement('label');
       const sw = document.createElement('span');
       sw.className = 'swatch';
@@ -437,9 +540,9 @@ textarea, input[type=text], input[type=number] {
       const input = document.createElement('input');
       input.type = 'text';
       input.placeholder = `Worker ${i + 1}`;
-      input.value = state.names[i] || '';
+      input.value = names[i] || '';
       input.setAttribute('aria-label', `Name for worker ${i + 1}`);
-      input.addEventListener('input', () => { state.names[i] = input.value; update(); });
+      input.addEventListener('input', () => { names[i] = input.value; update(); });
       label.append(sw, input);
       namesBox.append(label);
     }
@@ -456,7 +559,7 @@ textarea, input[type=text], input[type=number] {
     const rooms = buildRooms();
     const allBeds = rooms.flatMap((r) => r.beds);
     // Split only the occupied beds, in order, regardless of room.
-    const { groups } = divideBeds(allBeds, state.staffCount);
+    const { groups } = divideBeds(allBeds, workers(), extras());
 
     // Room grid
     grid.innerHTML = '';
@@ -508,14 +611,37 @@ textarea, input[type=text], input[type=number] {
     const occCount = allBeds.filter((b) => b.occupied).length;
     $('census').textContent = `${occCount} of ${allBeds.length} beds occupied in ${rooms.length} rooms.`;
 
+    // Shift tabs, worker count and names for the open tab.
+    for (const t of document.querySelectorAll('.tabs [role=tab]')) {
+      const on = t.dataset.shift === tab();
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+    }
+    $('shift-panel').setAttribute('aria-labelledby', `tab-${tab()}`);
+    $('print-shift').textContent = `${tab()} assignments, ${new Date().toLocaleDateString()}`;
+    if (document.activeElement !== countInput) countInput.value = workers();
+    renderNames();
+
     // Assignment list: one line per worker with their bed range.
     const bedOrder = allBeds.map((x) => x.id);
+    lastGroups = groups.map((g) => {
+      const occ = g.occupied;
+      if (!occ.length) return { count: 0, range: '' };
+      const first = occ[0], last = occ[occ.length - 1];
+      return { count: occ.length, range: first === last ? first : `${first} – ${last}` };
+    });
     results.innerHTML = '';
     groups.forEach((g, i) => {
       const li = el('li');
       li.style.borderLeftColor = color(i);
       const who = el('div', 'who');
-      who.append(el('span', null, staffName(i)),
+      const name = el('span', null, staffName(i));
+      if (extras()[i] && !extras().slice(0, workers()).every(Boolean)) {
+        const tag = el('span', 'tag', 'had extra');
+        tag.title = 'Got an extra patient earlier this round, so the next extras go to others first.';
+        name.append(' ', tag);
+      }
+      who.append(name,
                  el('span', 'count', `${g.occupied.length} patient${g.occupied.length === 1 ? '' : 's'}`));
       li.append(who);
       const occ = g.occupied;
@@ -531,7 +657,57 @@ textarea, input[type=text], input[type=number] {
       results.append(li);
     });
 
+    renderHistory();
     save();
+  }
+
+  function renderHistory() {
+    const list = $('history');
+    const items = history();
+    list.innerHTML = '';
+    $('history-empty').hidden = items.length > 0;
+    for (const h of items) {
+      const li = el('li');
+      const when = new Date(h.at);
+      const label = isNaN(when) ? 'Unknown time'
+        : when.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      li.append(el('span', 'when', label));
+      const total = h.counts.reduce((a, b) => a + b, 0);
+      li.append(el('span', 'counts', `${h.counts.length} worker${h.counts.length === 1 ? '' : 's'}: ${h.counts.join(' / ')} patients (${total} total)`));
+      li.title = h.ranges.filter(Boolean).map((r, i) => `Worker ${i + 1}: ${r}`).join('\n');
+      list.append(li);
+    }
+  }
+
+  function setFinalizeStatus(text, isError) {
+    const s = $('finalize-status');
+    s.hidden = !text;
+    s.textContent = text || '';
+    s.classList.toggle('error', !!isError);
+  }
+
+  // Record how many patients each worker in the open tab has, keeping the
+  // newest HISTORY_LENGTH records for that shift.
+  async function finalize() {
+    const counts = lastGroups.map((g) => g.count);
+    const ranges = lastGroups.map((g) => g.range);
+    const shift = tab();
+    if (!confirm(`Finalize ${shift}? This records ${counts.join(' / ')} patients for ${counts.length} worker${counts.length === 1 ? '' : 's'}.`)) return;
+    const entry = { at: new Date().toISOString(), counts, ranges };
+    const t = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (sharedShift()) {
+      queue({ op: 'finalize', shift, counts, ranges });
+      clearTimeout(flushTimer);
+      const ok = await flush();
+      setFinalizeStatus(ok ? `${shift} finalized at ${t}.` : `${shift} was not finalized. Check the message above and try again.`, !ok);
+      return;
+    }
+    const h = state.shifts[shift].history;
+    h.unshift(entry);
+    h.length = Math.min(h.length, HISTORY_LENGTH);
+    state.shifts[shift].extras = nextFlags(state.shifts[shift].extras, counts);
+    setFinalizeStatus(`${shift} finalized at ${t} (saved on this device).`);
+    update();
   }
 
   // Load the room layout from rooms.json next to this page. If that fails
@@ -579,12 +755,17 @@ textarea, input[type=text], input[type=number] {
     saved.rooms.forEach((r) => r.beds.forEach((b) => { if (!b.occupied) empty[r.room + b.label] = true; }));
     shared.empty = empty;
     shared.version = saved.version || 0;
+    // A Worker without shift support yet: keep counts and history on this device.
+    shared.shifts = saved.shifts && SHIFTS.every((n) => saved.shifts[n]) ? saved.shifts : null;
   }
 
   // The current layout and bed states, in the Worker's format. Sent with
   // every save so the very first save can start from rooms.json.
   function currentState() {
-    return { rooms: buildRooms().map((r) => ({ room: r.name, beds: r.beds.map((b) => ({ label: b.label, occupied: b.occupied })) })) };
+    return {
+      rooms: buildRooms().map((r) => ({ room: r.name, beds: r.beds.map((b) => ({ label: b.label, occupied: b.occupied })) })),
+      shifts: Object.fromEntries(SHIFTS.map((n) => [n, { workers: state.shifts[n].workers, history: state.shifts[n].history, extras: state.shifts[n].extras }])),
+    };
   }
 
   async function loadShared(quiet) {
@@ -593,6 +774,7 @@ textarea, input[type=text], input[type=number] {
       if (res.status === 404) {
         // Nothing saved yet: start from rooms.json; the first change saves it.
         shared.on = true;
+        if (!shared.shifts) shared.shifts = JSON.parse(JSON.stringify(currentState().shifts));
         if (!quiet) setSync('Shared: changes save for everyone.');
       } else if (!res.ok) {
         throw new Error(`error ${res.status}`);
@@ -625,15 +807,17 @@ textarea, input[type=text], input[type=number] {
     flushTimer = setTimeout(flush, 400);
   }
 
+  // Sends queued changes; resolves true if they were saved.
   async function flush() {
-    if (saving || !pending.length) return;
+    if (saving || !pending.length) return false;
+    let ok = false;
     const code = getCode(true);
     if (!code) {
       setSync('Not saved: the passcode is needed to make changes.', true);
       pending.length = 0;
       shared.version = -1;
       await loadShared(true); update();
-      return;
+      return false;
     }
     const ops = pending.splice(0);
     saving = true;
@@ -654,6 +838,7 @@ textarea, input[type=text], input[type=number] {
       if (!pending.length) applyShared(body);
       const t = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
       setSync(`Saved for everyone at ${t}.`);
+      ok = true;
     } catch (e) {
       saving = false;
       pending.length = 0;
@@ -662,7 +847,8 @@ textarea, input[type=text], input[type=number] {
       await loadShared(true);
     }
     update();
-    if (pending.length) flush();
+    if (pending.length) return (await flush()) && ok;
+    return ok;
   }
 
   // Size the + and − squares to 75% of a bed's width.
@@ -671,7 +857,9 @@ textarea, input[type=text], input[type=number] {
     if (!bed) return;
     const w = bed.getBoundingClientRect().width;
     grid.style.setProperty('--bed-size', `${w}px`);
-    grid.style.setProperty('--tool-size', `${Math.round(w * 0.75)}px`);
+    // Never taller than a bed, or rooms with a "+" would grow taller than the rest.
+    const h = bed.getBoundingClientRect().height;
+    grid.style.setProperty('--tool-size', `${Math.round(Math.min(w * 0.75, h))}px`);
   }
   window.addEventListener('resize', () => { if (editing) sizeTools(); });
 
@@ -732,18 +920,33 @@ textarea, input[type=text], input[type=number] {
 
 
   countInput.addEventListener('change', () => setStaffCount(countInput.value));
-  $('staff-minus').addEventListener('click', () => setStaffCount(state.staffCount - 1));
-  $('staff-plus').addEventListener('click', () => setStaffCount(state.staffCount + 1));
+  $('staff-minus').addEventListener('click', () => setStaffCount(workers() - 1));
+  $('staff-plus').addEventListener('click', () => setStaffCount(workers() + 1));
   $('print').addEventListener('click', () => window.print());
+  $('finalize').addEventListener('click', finalize);
+  const tabs = [...document.querySelectorAll('.tabs [role=tab]')];
+  tabs.forEach((t, i) => {
+    t.addEventListener('click', () => setTab(t.dataset.shift));
+    t.addEventListener('keydown', (e) => {
+      const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!step) return;
+      const next = tabs[(i + step + tabs.length) % tabs.length];
+      setTab(next.dataset.shift);
+      next.focus();
+    });
+  });
   $('reset').addEventListener('click', () => {
-    if (!confirm('Mark every bed occupied again and clear worker names?')) return;
+    if (!confirm('Mark every bed occupied again and clear the worker names on this device?')) return;
+    const keep = state.shifts;
     state = defaults();
+    // Worker counts and finalized history are kept; only names are cleared.
+    for (const n of SHIFTS) Object.assign(state.shifts[n], { workers: keep[n].workers, history: keep[n].history, extras: keep[n].extras });
     if (shared.on) { shared.empty = {}; queue({ op: 'setAll', occupied: true }); }
     namesBox.innerHTML = '';
-    setStaffCount(state.staffCount);
+    update();
   });
 
-  setStaffCount(state.staffCount);
+  update();
   loadLayout();
 })();
   </script>
