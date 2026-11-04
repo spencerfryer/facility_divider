@@ -158,7 +158,7 @@ textarea, input[type=text], input[type=number] {
         <button type="button" class="link" id="edit-toggle" aria-expanded="false">Edit layout</button>
       </div>
       <div id="layout-editor" class="bed-editor" hidden>
-        <label for="room-list">Room names in hallway order. Use commas or new lines; ranges like <code>1-38</code> or <code>101-138</code> work.</label>
+        <label for="room-list">Room names in hallway order. Use commas or new lines; ranges like <code>1-12, 14-39</code> work.</label>
         <textarea id="room-list" rows="3" spellcheck="false"></textarea>
         <div class="row">
           <button type="button" id="apply-rooms">Update rooms</button>
@@ -380,7 +380,7 @@ textarea, input[type=text], input[type=number] {
   <script>
 (function () {
   const { divideBeds, divideRooms, parseBedList } = window.Divider;
-  const STORE = 'bed-divider:v2';
+  const STORE = 'bed-divider:v3';
   const LETTERS = 'ABC';
   // Distinct colors that keep white text readable.
   const COLORS = ['#1f6feb', '#d1453b', '#1a7f37', '#8250df', '#bc4c00', '#0a7d8c', '#bf3989', '#6e7781',
@@ -388,7 +388,7 @@ textarea, input[type=text], input[type=number] {
   const color = (i) => COLORS[i % COLORS.length];
 
   const defaults = () => ({
-    roomText: '1-38', rooms: parseBedList('1-38'), threeBed: {}, occupied: {},
+    roomText: '1-12, 14-39', rooms: parseBedList('1-12, 14-39'), threeBed: {}, occupied: {},
     staffCount: 4, names: [], splitRooms: false,
   });
 

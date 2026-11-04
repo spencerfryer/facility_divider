@@ -4,7 +4,7 @@ A small web page that splits the occupied beds in a unit evenly among the staff 
 
 ## How it works
 
-1. **Rooms and beds.** The default layout is 38 rooms (`1-38`) with 2 beds each (A, B). Use **Edit layout** to rename rooms (ranges like `101-138` work) and tap a room's name to switch it between 2 and 3 beds. List rooms in hallway order. Then tap beds to mark them occupied or empty.
+1. **Rooms and beds.** The default layout is 38 rooms numbered 1 to 39 with no room 13 (`1-12, 14-39`), 2 beds each (A, B). Use **Edit layout** to rename rooms (ranges like `101-138` work) and tap a room's name to switch it between 2 and 3 beds. List rooms in hallway order. Then tap beds to mark them occupied or empty.
 2. **Staff.** Set how many people are working. Names are optional.
 3. **Assignments.** Rooms are divided into one block per person:
    - **A room is never split between people**, and each person gets a **contiguous run of rooms**, so assignments stay geographically together.
