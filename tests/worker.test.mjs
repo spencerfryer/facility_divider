@@ -75,3 +75,28 @@ test('bad changes are rejected without saving', async () => {
   assert.match((await res.json()).error, /no room 99/);
   assert.strictEqual((await (await call(env, 'GET', '/state')).json()).version, 1);
 });
+
+test('worker counts are saved per shift', () => {
+  let s = applyOps(seed(), [{ op: 'setWorkers', shift: 'PM', workers: 3 }, { op: 'setWorkers', shift: 'NOC', workers: 99 }]);
+  assert.strictEqual(s.shifts.AM.workers, 4);
+  assert.strictEqual(s.shifts.PM.workers, 3);
+  assert.strictEqual(s.shifts.NOC.workers, 50);
+  assert.throws(() => applyOps(s, [{ op: 'setWorkers', shift: 'LATE', workers: 2 }]), /no shift LATE/);
+});
+
+test('finalize keeps the newest 7 per shift', () => {
+  let s = seed();
+  for (let i = 1; i <= 9; i++) s = applyOps(s, [{ op: 'finalize', shift: 'AM', counts: [i, i], ranges: ['1A – 1B', '2A – 2C'] }]);
+  assert.strictEqual(s.shifts.AM.history.length, 7);
+  assert.deepStrictEqual(s.shifts.AM.history.map((h) => h.counts[0]), [9, 8, 7, 6, 5, 4, 3]);
+  assert.deepStrictEqual(s.shifts.AM.history[0].ranges, ['1A – 1B', '2A – 2C']);
+  assert.strictEqual(s.shifts.PM.history.length, 0);
+  assert.throws(() => applyOps(s, [{ op: 'finalize', shift: 'AM', counts: [] }]), /patient counts/);
+  assert.throws(() => applyOps(s, [{ op: 'finalize', shift: 'AM', counts: [1.5] }]), /patient counts/);
+});
+
+test('older saves without shifts still load', () => {
+  const s = applyOps({ version: 3, rooms: seed().rooms }, []);
+  assert.deepStrictEqual(Object.keys(s.shifts), ['AM', 'PM', 'NOC']);
+  assert.strictEqual(s.version, 3);
+});

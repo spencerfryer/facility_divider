@@ -9,10 +9,17 @@
  *       { "room": "1", "beds": [ { "label": "A", "occupied": true },
  *                                { "label": "B", "occupied": false } ] },
  *       ...
- *     ]
+ *     ],
+ *     "shifts": {
+ *       "AM":  { "workers": 4, "history": [
+ *                  { "at": "2026-11-04T07:05:00Z", "counts": [13, 13, 12], "ranges": ["1A – 9A", ...] } ] },
+ *       "PM":  { "workers": 3, "history": [] },
+ *       "NOC": { "workers": 2, "history": [] }
+ *     }
  *   }
- * So it holds the rooms, how many beds each room has, and whether each bed
- * is occupied.
+ * So it holds the rooms, how many beds each room has, whether each bed is
+ * occupied, and for each shift the number of workers plus the last
+ * HISTORY_LENGTH finalized assignments (newest first).
  *
  * Routes:
  *   GET  /state   anyone: returns the saved state (404 if nothing saved yet)
@@ -25,6 +32,9 @@
  */
 
 export const MAX_BEDS = 3;
+export const SHIFTS = ['AM', 'PM', 'NOC'];
+export const HISTORY_LENGTH = 7;
+const MAX_WORKERS = 50;
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const KEY = 'state';
 
@@ -63,12 +73,27 @@ export function validateState(s) {
   return s;
 }
 
-/** Keep only the fields we store. */
+const clampWorkers = (n) => Math.max(1, Math.min(MAX_WORKERS, Math.floor(Number(n)) || 1));
+
+/** Keep only the fields we store, filling in shift defaults for older saves. */
 export function cleanState(s) {
+  const shifts = {};
+  for (const name of SHIFTS) {
+    const sh = (s.shifts && s.shifts[name]) || {};
+    shifts[name] = {
+      workers: clampWorkers(sh.workers ?? 4),
+      history: Array.isArray(sh.history) ? sh.history.slice(0, HISTORY_LENGTH).map((h) => ({
+        at: String(h.at || ''),
+        counts: Array.isArray(h.counts) ? h.counts.map((c) => Math.max(0, Math.floor(Number(c)) || 0)) : [],
+        ranges: Array.isArray(h.ranges) ? h.ranges.map((r) => String(r).slice(0, 40)) : [],
+      })) : [],
+    };
+  }
   return {
     version: Number.isInteger(s.version) ? s.version : 0,
     updatedAt: s.updatedAt || null,
     rooms: s.rooms.map((r) => ({ room: r.room, beds: r.beds.map((b) => ({ label: b.label, occupied: b.occupied })) })),
+    shifts,
   };
 }
 
@@ -78,6 +103,9 @@ export function cleanState(s) {
  *   { op: "addBed", room: "12" }       adds the next letter, up to MAX_BEDS; new bed starts occupied
  *   { op: "removeBed", room: "12" }    removes the room's last bed, keeps at least one
  *   { op: "setAll", occupied: true }   marks every bed occupied (or empty)
+ *   { op: "setWorkers", shift: "AM", workers: 4 }
+ *   { op: "finalize", shift: "AM", counts: [13, 13, 12], ranges: ["1A – 9A", ...] }
+ *        records the patients per worker; keeps the newest HISTORY_LENGTH
  */
 export function applyOps(state, ops) {
   if (!Array.isArray(ops) || ops.length > 200) throw new Error('"ops" must be a list of up to 200 changes');
@@ -112,6 +140,23 @@ export function applyOps(state, ops) {
       case 'setAll':
         s.rooms.forEach((r) => r.beds.forEach((b) => { b.occupied = !!o.occupied; }));
         break;
+      case 'setWorkers': {
+        if (!SHIFTS.includes(o.shift)) throw new Error(`no shift ${o.shift}`);
+        s.shifts[o.shift].workers = clampWorkers(o.workers);
+        break;
+      }
+      case 'finalize': {
+        if (!SHIFTS.includes(o.shift)) throw new Error(`no shift ${o.shift}`);
+        if (!Array.isArray(o.counts) || o.counts.length < 1 || o.counts.length > MAX_WORKERS
+            || !o.counts.every((c) => Number.isInteger(c) && c >= 0 && c <= 10000)) {
+          throw new Error('finalize needs a list of patient counts');
+        }
+        const ranges = Array.isArray(o.ranges) ? o.ranges.slice(0, o.counts.length).map((r) => String(r).slice(0, 40)) : [];
+        const h = s.shifts[o.shift].history;
+        h.unshift({ at: new Date().toISOString(), counts: o.counts, ranges });
+        h.length = Math.min(h.length, HISTORY_LENGTH);
+        break;
+      }
       default:
         throw new Error(`unknown change "${o && o.op}"`);
     }

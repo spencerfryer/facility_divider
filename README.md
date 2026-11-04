@@ -5,11 +5,11 @@ A small web page that splits the occupied beds in a unit evenly among the staff 
 ## How it works
 
 1. **Rooms and beds.** The rooms come from [`rooms.json`](rooms.json) (see below). The page shows every room in one column with a block for each bed. Every bed starts out occupied (orange); tap the empty ones to clear them.
-2. **Workers.** Below the rooms, enter how many people are working. Names are optional.
-3. **Assignments.** Only the occupied beds are divided, in order, regardless of room:
+2. **Assignments.** Pick the **AM**, **PM** or **NOC** tab and set how many people are working that shift (each tab remembers its own number). Names are optional. Only the occupied beds are divided, in order, regardless of room:
    - Each worker gets a **continuous run of occupied beds**, and patient counts differ by **at most one** (the first workers get the extra patient).
    - A room can be shared: if one worker's range ends on 29B, the next starts on 29C.
    - Each worker's line shows their range (for example *Beds 1A – 9A*) and any empty beds inside it to skip.
+   - **Print** prints that tab's list. **Finalize** records how many patients each worker got; each tab keeps its last 7 finalized records, newest first.
 
 Everything is saved in the browser's local storage on that device only. Nothing is sent anywhere.
 
@@ -30,7 +30,7 @@ Edit `rooms.json` on GitHub (open it, click the pencil, commit). The calculator 
 
 ## Shared bed list (optional)
 
-With the small Cloudflare Worker in [`worker/`](worker/README.md) set up, the room layout and the occupied beds are shared by everyone who opens the page. Staff with the passcode can tap beds and use **Edit beds** to add or remove beds (up to 3 per room), and every change saves for everyone. Without it, the page works as before: rooms come from `rooms.json`, and taps stay on that device.
+With the small Cloudflare Worker in [`worker/`](worker/README.md) set up, the room layout and the occupied beds are shared by everyone who opens the page. Staff with the passcode can tap beds and use **Edit beds** to add or remove beds (up to 3 per room), and every change saves for everyone, including each shift's worker count and finalized history (worker names stay on each device). Without it, the page works as before: rooms come from `rooms.json`, and taps stay on that device.
 
 ## Run locally
 

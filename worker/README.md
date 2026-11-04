@@ -16,6 +16,10 @@ It saves one JSON document in Cloudflare KV, under the key `state`:
 
 Nothing is stored until the first change. That first save starts from `rooms.json`. After that, the Worker's copy is the source of truth, and `rooms.json` only matters if the Worker can't be reached.
 
+## Updating the code
+
+When `worker.js` changes (for example the AM/PM/NOC shift support), open the Worker in Cloudflare, click **Edit code**, replace everything with the new [`worker.js`](worker.js), and click **Deploy**. Saved rooms and beds are kept. Until you do, the page still works but keeps worker counts and finalized history on each device.
+
 ## Deploy it (Cloudflare dashboard, about 10 minutes, free plan is fine)
 
 1. **Create the storage.** In the Cloudflare dashboard, go to **Storage & Databases → KV → Create**. Name it `bed-divider`.
