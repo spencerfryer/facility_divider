@@ -231,22 +231,21 @@ textarea, input[type=text], input[type=number] {
   <main>
     <section class="panel" aria-labelledby="beds-h">
       <div class="panel-head">
-        <h2 id="beds-h">1. Rooms</h2>
+        <h2 id="beds-h">Beds</h2>
         <button type="button" class="ghost" id="edit-toggle" aria-pressed="false" hidden>Edit beds</button>
       </div>
       <p class="layout-note" id="layout-note" hidden></p>
-      <p class="sync" id="sync-status" hidden></p>
       <p class="hint" id="edit-hint" hidden>Tap <strong>+</strong> in a room to add a bed (up to 3), or <strong>−</strong> beside a room to remove its last bed. Changes save for everyone.</p>
-      <p class="hint">Every bed starts as occupied. Tap the empty ones to clear them.</p>
       <p class="legend"><span class="key occ"></span> Occupied <span class="key"></span> Empty <span class="census" id="census"></span></p>
-      <div class="row tight">
+      <p class="sync" id="sync-status" hidden></p>
+      <div id="room-grid" class="room-grid" role="group" aria-label="Rooms"></div>
+      <div class="row" style="margin-top: 12px; margin-bottom: 0;">
         <button type="button" class="ghost" id="all-occ">Mark all occupied</button>
       </div>
-      <div id="room-grid" class="room-grid" role="group" aria-label="Rooms"></div>
     </section>
 
     <section class="panel" aria-labelledby="result-h">
-      <h2 id="result-h">2. Assignments</h2>
+      <h2 id="result-h">Assignments</h2>
       <div class="tabs" role="tablist" aria-label="Shift">
         <button type="button" role="tab" id="tab-AM" data-shift="AM" aria-controls="shift-panel">AM</button>
         <button type="button" role="tab" id="tab-PM" data-shift="PM" aria-controls="shift-panel">PM</button>
