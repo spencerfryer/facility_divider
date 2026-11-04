@@ -4,7 +4,7 @@ A small web page that splits the occupied beds in a unit evenly among the staff 
 
 ## How it works
 
-1. **Rooms and beds.** The default layout is 37 rooms numbered 1 to 38 with no room 13 (`1-12, 14-38`), 2 beds each (A, B). Use **Edit layout** to rename rooms (ranges like `101-138` work) and tap a room's name to switch it between 2 and 3 beds. List rooms in hallway order. The first screen shows every room in one column with a block for each bed: tap a bed to fill it orange (occupied) or clear it (empty), then tap **Divide beds**.
+1. **Rooms and beds.** The rooms come from [`rooms.json`](rooms.json) (see below). The first screen shows every room in one column with a block for each bed: tap a bed to fill it orange (occupied) or clear it (empty), then tap **Divide beds**.
 2. **Staff.** On the second screen, set how many people are working. Names are optional.
 3. **Assignments.** Rooms are divided into one block per person:
    - **A room is never split between people**, and each person gets a **contiguous run of rooms**, so assignments stay geographically together.
@@ -14,9 +14,24 @@ A small web page that splits the occupied beds in a unit evenly among the staff 
 
 Everything is saved in the browser's local storage on that device only. Nothing is sent anywhere.
 
+## Changing the rooms
+
+Edit `rooms.json` on GitHub (open it, click the pencil, commit). The calculator itself doesn't change. Each room is one line, in hallway order:
+
+```json
+{ "room": "12", "beds": 2 },
+{ "room": "14", "beds": 3 },
+{ "room": "40", "beds": ["A", "B", "Window"] }
+```
+
+- `beds` is the number of beds (labelled A, B, C...), or a list of your own labels.
+- To add a room, copy a line and change the number. Every line except the last needs a comma.
+- If the file has a mistake, the page shows a red note saying what's wrong and uses its built-in list (37 rooms, 1 to 38 without 13, 2 beds each) until it's fixed.
+- GitHub Pages can take a few minutes to pick up a change.
+
 ## Run locally
 
-Open `index.html` in a browser. To run the tests of the splitting logic (Node 18+):
+Opening `index.html` straight from disk works, but browsers block it from reading `rooms.json` that way, so it uses the built-in room list. To use `rooms.json` locally, run `python3 -m http.server` in this folder and open http://localhost:8000. To run the tests of the splitting logic (Node 18+):
 
 ```sh
 node --test tests/*.test.js
@@ -31,5 +46,6 @@ node --test tests/*.test.js
 
 ## Files
 
-- `index.html` – the whole app. You can also just email or copy this one file and open it anywhere.
+- `index.html` – the whole app
+- `rooms.json` – the room and bed list
 - `tests/divide.test.js` – tests for the splitting logic, read straight out of `index.html`

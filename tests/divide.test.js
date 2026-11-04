@@ -120,3 +120,26 @@ test('38 rooms with 5 staff stays fast and balanced', () => {
   const loads = r.groups.map((g) => g.occupied.length);
   assert.ok(Math.max(...loads) - Math.min(...loads) <= 3, String(loads));
 });
+
+const { parseLayout } = Object.fromEntries(
+  Object.entries(sandbox.self.Divider).map(([k, fn]) => [k, wrap(fn)]));
+
+test('parseLayout reads bed counts and custom labels', () => {
+  assert.deepStrictEqual(parseLayout({ rooms: [{ room: 1, beds: 2 }, { room: '2', beds: 3 }, { room: '3', beds: ['A', 'W'] }] }), [
+    { name: '1', beds: ['A', 'B'] }, { name: '2', beds: ['A', 'B', 'C'] }, { name: '3', beds: ['A', 'W'] },
+  ]);
+});
+
+test('parseLayout gives plain-English errors', () => {
+  assert.throws(() => parseLayout({}), /"rooms" list/);
+  assert.throws(() => parseLayout({ rooms: [{ room: '1', beds: 2 }, { room: '1', beds: 2 }] }), /listed twice/);
+  assert.throws(() => parseLayout({ rooms: [{ room: '1', beds: 'two' }] }), /should be a number/);
+  assert.throws(() => parseLayout({ rooms: [{ beds: 2 }] }), /no "room" name/);
+});
+
+test('rooms.json is valid: 37 rooms, no room 13', () => {
+  const data = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'rooms.json'), 'utf8'));
+  const rooms = parseLayout(data);
+  assert.strictEqual(rooms.length, 37);
+  assert.ok(!rooms.some((r) => r.name === '13'));
+});

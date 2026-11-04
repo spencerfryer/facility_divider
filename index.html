@@ -132,9 +132,6 @@ textarea, input[type=text], input[type=number] {
   background: none; border: none; color: var(--text); padding: 0; min-height: 0;
   font-weight: 700; font-size: 1.25rem; cursor: default;
 }
-.room-name:disabled { opacity: 1; }
-.editing .room-name { cursor: pointer; color: var(--accent); text-decoration: underline; }
-.bed-count { font-size: 0.7rem; font-weight: 500; color: var(--muted); }
 .beds-row { display: flex; gap: 8px; flex: 1; }
 .beds-row .bed {
   flex: 1; min-width: 0; min-height: 52px; padding: 0; border-radius: 8px;
@@ -155,13 +152,15 @@ textarea, input[type=text], input[type=number] {
 .nextbar button { font-weight: 650; }
 #census-bar { color: var(--muted); font-size: 0.9rem; }
 .back { margin-top: 16px; }
+.layout-note { font-size: 0.9rem; border-radius: 8px; padding: 8px 10px; margin: 0 0 10px; background: var(--bg); color: var(--muted); }
+.layout-note.error { color: #b42318; border: 1px solid #b42318; }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 0.9rem; color: var(--muted); margin: 8px 0; }
 .check input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
 .card .span { margin: 0; font-size: 0.9rem; color: var(--muted); }
 
 @media print {
   body { background: #fff; color: #000; }
-  .top .sub, .row, .hint, .names, #print, .foot, #edit-toggle, .bed-editor, .check, .nextbar, .back, #page-beds { display: none !important; }
+  .top .sub, .row, .hint, .names, #print, .foot, .layout-note, .check, .nextbar, .back, #page-beds { display: none !important; }
   #page-divide { display: block !important; }
   .panel { border: none; padding: 0; margin: 8px 0; }
   .bed, .card { -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; }
@@ -179,16 +178,8 @@ textarea, input[type=text], input[type=number] {
     <section class="panel" aria-labelledby="beds-h">
       <div class="panel-head">
         <h2 id="beds-h">Rooms</h2>
-        <button type="button" class="link" id="edit-toggle" aria-expanded="false">Edit layout</button>
       </div>
-      <div id="layout-editor" class="bed-editor" hidden>
-        <label for="room-list">Room names in hallway order. Use commas or new lines; ranges like <code>1-12, 14-38</code> work.</label>
-        <textarea id="room-list" rows="3" spellcheck="false"></textarea>
-        <div class="row">
-          <button type="button" id="apply-rooms">Update rooms</button>
-        </div>
-        <p class="hint"><strong>While this panel is open, tap a room's name to switch it between 2 and 3 beds.</strong> Close it when you're done. Your layout is remembered on this device.</p>
-      </div>
+      <p class="layout-note" id="layout-note" hidden></p>
       <p class="legend"><span class="key occ"></span> Occupied <span class="key"></span> Empty <span class="census" id="census"></span></p>
       <div class="row tight">
         <button type="button" class="ghost" id="all-occ">All occupied</button>
@@ -405,33 +396,61 @@ textarea, input[type=text], input[type=number] {
     return out.filter((id, i) => out.indexOf(id) === i);
   }
 
-  const api = { evenSizes, divideBeds, divideRooms, parseBedList };
+  /**
+   * Read the room layout from rooms.json. Each room is
+   *   { "room": "12", "beds": 2 }            -> beds A, B
+   *   { "room": "12", "beds": ["A","B","W"] } -> custom bed labels
+   * Throws an Error with a plain-English message if something is off.
+   */
+  function parseLayout(data) {
+    const list = data && Array.isArray(data.rooms) ? data.rooms : null;
+    if (!list || !list.length) throw new Error('The file needs a "rooms" list with at least one room.');
+    const seen = new Set();
+    return list.map((r, i) => {
+      const name = r && r.room != null ? String(r.room).trim() : '';
+      if (!name) throw new Error(`Room number ${i + 1} in the list has no "room" name.`);
+      if (seen.has(name)) throw new Error(`Room ${name} is listed twice.`);
+      seen.add(name);
+      let labels;
+      if (Array.isArray(r.beds)) labels = r.beds.map((b) => String(b).trim()).filter(Boolean);
+      else {
+        const n = Number(r.beds);
+        if (!Number.isInteger(n) || n < 1 || n > 26) throw new Error(`Room ${name}: "beds" should be a number like 2 or 3.`);
+        labels = Array.from({ length: n }, (_, j) => String.fromCharCode(65 + j));
+      }
+      if (!labels.length) throw new Error(`Room ${name} has no beds.`);
+      if (new Set(labels).size !== labels.length) throw new Error(`Room ${name} has two beds with the same label.`);
+      return { name, beds: labels };
+    });
+  }
+
+  const api = { evenSizes, divideBeds, divideRooms, parseBedList, parseLayout };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Divider = api;
 })(typeof self !== 'undefined' ? self : this);
   </script>
   <script>
 (function () {
-  const { divideBeds, divideRooms, parseBedList } = window.Divider;
-  const STORE = 'bed-divider:v4';
-  const LETTERS = 'ABC';
+  const { divideBeds, divideRooms } = window.Divider;
+  const { parseLayout } = window.Divider;
+  const STORE = 'bed-divider:v5';
+  // Used only if rooms.json can't be loaded (for example when this page is
+  // opened straight from a file instead of from the website).
+  const FALLBACK_LAYOUT = { rooms: [{ room: "1", beds: 2 }, { room: "2", beds: 2 }, { room: "3", beds: 2 }, { room: "4", beds: 2 }, { room: "5", beds: 2 }, { room: "6", beds: 2 }, { room: "7", beds: 2 }, { room: "8", beds: 2 }, { room: "9", beds: 2 }, { room: "10", beds: 2 }, { room: "11", beds: 2 }, { room: "12", beds: 2 }, { room: "14", beds: 2 }, { room: "15", beds: 2 }, { room: "16", beds: 2 }, { room: "17", beds: 2 }, { room: "18", beds: 2 }, { room: "19", beds: 2 }, { room: "20", beds: 2 }, { room: "21", beds: 2 }, { room: "22", beds: 2 }, { room: "23", beds: 2 }, { room: "24", beds: 2 }, { room: "25", beds: 2 }, { room: "26", beds: 2 }, { room: "27", beds: 2 }, { room: "28", beds: 2 }, { room: "29", beds: 2 }, { room: "30", beds: 2 }, { room: "31", beds: 2 }, { room: "32", beds: 2 }, { room: "33", beds: 2 }, { room: "34", beds: 2 }, { room: "35", beds: 2 }, { room: "36", beds: 2 }, { room: "37", beds: 2 }, { room: "38", beds: 2 }] };
   // Distinct colors that keep white text readable.
   const COLORS = ['#1f6feb', '#d1453b', '#1a7f37', '#8250df', '#bc4c00', '#0a7d8c', '#bf3989', '#6e7781',
                   '#9a6700', '#0550ae', '#a40e26', '#116329', '#6639ba', '#953800', '#1b7c83', '#99286e'];
   const color = (i) => COLORS[i % COLORS.length];
 
-  const defaults = () => ({
-    roomText: '1-12, 14-38', rooms: parseBedList('1-12, 14-38'), threeBed: {}, occupied: {},
-    staffCount: 4, names: [], splitRooms: false,
-  });
+  const defaults = () => ({ occupied: {}, staffCount: 4, names: [], splitRooms: false });
 
   let state = load();
-  let editing = false;
+  let layout = parseLayout(FALLBACK_LAYOUT);
 
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(STORE));
-      if (s && Array.isArray(s.rooms)) return Object.assign(defaults(), s);
+      if (s && typeof s === 'object') return Object.assign(defaults(), s);
     } catch (e) { /* storage unavailable */ }
     return defaults();
   }
@@ -446,12 +465,12 @@ textarea, input[type=text], input[type=number] {
   const namesBox = $('staff-names');
 
   const staffName = (i) => (state.names[i] || '').trim() || `Staff ${i + 1}`;
-  const bedCount = (room) => (state.threeBed[room] ? 3 : 2);
-  const buildRooms = () => state.rooms.map((name) => ({
-    name,
-    beds: Array.from({ length: bedCount(name) }, (_, j) => {
-      const id = name + LETTERS[j];
-      return { id, occupied: !!state.occupied[id] };
+  // Bed ids look like "12A"; the label is the part after the room name.
+  const buildRooms = () => layout.map((r) => ({
+    name: r.name,
+    beds: r.beds.map((label) => {
+      const id = r.name + label;
+      return { id, label, occupied: !!state.occupied[id] };
     }),
   }));
 
@@ -492,42 +511,26 @@ textarea, input[type=text], input[type=number] {
   function update() {
     const rooms = buildRooms();
     const allBeds = rooms.flatMap((r) => r.beds);
+    const roomOfBed = {};
+    rooms.forEach((r) => r.beds.forEach((b) => { roomOfBed[b.id] = r.name; }));
     const { groups } = state.splitRooms
       ? divideBeds(allBeds, state.staffCount)
       : divideRooms(rooms, state.staffCount);
 
     // Room grid
     grid.innerHTML = '';
-    grid.classList.toggle('editing', editing);
     for (const room of rooms) {
       const box = el('div', 'room');
 
-      const head = el('button', 'room-name');
-      head.type = 'button';
-      head.textContent = room.name;
-      if (editing) {
-        head.append(el('span', 'bed-count', `${room.beds.length} beds`));
-        head.setAttribute('aria-label', `Room ${room.name}, ${room.beds.length} beds. Tap to switch to ${room.beds.length === 3 ? 2 : 3}.`);
-        head.addEventListener('click', () => {
-          if (state.threeBed[room.name]) {
-            delete state.threeBed[room.name];
-            delete state.occupied[room.name + 'C'];
-          } else state.threeBed[room.name] = true;
-          update();
-        });
-      } else {
-        head.disabled = true;
-        head.setAttribute('aria-label', `Room ${room.name}`);
-      }
-      box.append(head);
+      box.append(el('div', 'room-name', room.name));
 
       const bedsRow = el('div', 'beds-row');
       for (const b of room.beds) {
         const btn = el('button', 'bed ' + (b.occupied ? 'occupied' : 'empty'));
         btn.type = 'button';
         btn.setAttribute('aria-pressed', String(b.occupied));
-        btn.setAttribute('aria-label', `Room ${room.name} bed ${b.id.slice(room.name.length)}, ${b.occupied ? 'occupied' : 'empty'}`);
-        btn.textContent = b.id.slice(room.name.length);
+        btn.setAttribute('aria-label', `Room ${room.name} bed ${b.label}, ${b.occupied ? 'occupied' : 'empty'}`);
+        btn.textContent = b.label;
         btn.addEventListener('click', () => {
           if (state.occupied[b.id]) delete state.occupied[b.id]; else state.occupied[b.id] = true;
           update();
@@ -554,7 +557,7 @@ textarea, input[type=text], input[type=number] {
       h.append(el('span', null, staffName(i)),
                el('span', 'count', `${g.occupied.length} patient${g.occupied.length === 1 ? '' : 's'}`));
       card.append(h);
-      const roomNames = g.rooms || [...new Set([...g.occupied, ...g.empty].map((id) => id.slice(0, -1)))];
+      const roomNames = g.rooms || [...new Set([...g.occupied, ...g.empty].map((id) => roomOfBed[id]))];
       if (roomNames.length) {
         const span = roomNames.length === 1 ? `Room ${roomNames[0]}` : `Rooms ${roomNames[0]} to ${roomNames[roomNames.length - 1]}`;
         card.append(el('p', 'span', span));
@@ -567,25 +570,32 @@ textarea, input[type=text], input[type=number] {
     save();
   }
 
-  // Layout editor
-  const editor = $('layout-editor');
-  const toggle = $('edit-toggle');
-  const roomList = $('room-list');
-  toggle.addEventListener('click', () => {
-    editing = editor.hidden;
-    editor.hidden = !editing;
-    toggle.setAttribute('aria-expanded', String(editing));
-    toggle.textContent = editing ? 'Done editing' : 'Edit layout';
-    if (editing) roomList.value = state.roomText;
+  // Load the room layout from rooms.json next to this page. If that fails
+  // (no file, a typo in it, or the page was opened from disk), fall back to
+  // the built-in layout and say so.
+  function showNote(text, isError) {
+    const note = $('layout-note');
+    note.hidden = !text;
+    note.textContent = text || '';
+    note.classList.toggle('error', !!isError);
+  }
+  async function loadLayout() {
+    if (location.protocol === 'file:') {
+      showNote('Opened from a file, so the built-in room list is being used. On the website, rooms come from rooms.json.');
+      return;
+    }
+    try {
+      const res = await fetch('rooms.json', { cache: 'no-cache' });
+      if (!res.ok) throw new Error(`rooms.json could not be loaded (error ${res.status}).`);
+      let data;
+      try { data = await res.json(); } catch (e) { throw new Error('rooms.json has a formatting mistake (check for a missing comma or quote).'); }
+      layout = parseLayout(data);
+      showNote('');
+    } catch (e) {
+      showNote(`${e.message} Showing the built-in room list instead.`, true);
+    }
     update();
-  });
-  $('apply-rooms').addEventListener('click', () => {
-    const rooms = parseBedList(roomList.value);
-    if (!rooms.length) { roomList.focus(); return; }
-    state.roomText = roomList.value;
-    state.rooms = rooms;
-    update();
-  });
+  }
 
   $('all-occ').addEventListener('click', () => {
     state.occupied = {};
@@ -627,6 +637,7 @@ textarea, input[type=text], input[type=number] {
 
   setStaffCount(state.staffCount);
   showPage();
+  loadLayout();
 })();
   </script>
 </body>
