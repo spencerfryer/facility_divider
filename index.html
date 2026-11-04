@@ -240,7 +240,7 @@ textarea, input[type=text], input[type=number] {
 .check input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
 .card .span { margin: 0; font-size: 0.9rem; color: var(--muted); }
 
-.tabs { display: flex; gap: 6px; padding: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; margin: 12px 0 22px; }
+.tabs { display: flex; gap: 6px; padding: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; margin: 0 0 22px; }
 .tabs [role=tab] {
   flex: 1; background: transparent; color: var(--muted); border: 1px solid transparent;
   border-radius: 7px; min-height: 44px; font-size: 1.05rem; font-weight: 700; letter-spacing: 0.02em;
@@ -348,8 +348,7 @@ textarea, input[type=text], input[type=number] {
       </div>
     </section>
 
-    <section class="panel" aria-labelledby="result-h">
-      <h2 id="result-h">Assignments</h2>
+    <section class="panel" aria-label="Assignments">
       <div class="tabs" role="tablist" aria-label="Shift">
         <button type="button" role="tab" id="tab-AM" data-shift="AM" aria-controls="shift-panel">AM</button>
         <button type="button" role="tab" id="tab-PM" data-shift="PM" aria-controls="shift-panel">PM</button>
