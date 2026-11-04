@@ -231,7 +231,6 @@ textarea, input[type=text], input[type=number] {
       <p class="layout-note" id="layout-note" hidden></p>
       <p class="hint" id="edit-hint" hidden>Tap <strong>+</strong> in a room to add a bed (up to 3), or <strong>−</strong> beside a room to remove its last bed. Changes save for everyone.</p>
       <p class="legend"><span class="key occ"></span> Occupied <span class="key"></span> Empty <span class="census" id="census"></span></p>
-      <p class="sync" id="sync-status" hidden></p>
       <div id="room-grid" class="room-grid" role="group" aria-label="Rooms"></div>
       <div class="row" style="margin-top: 12px; margin-bottom: 0;">
         <button type="button" class="ghost" id="all-occ">Mark all occupied</button>
@@ -268,6 +267,7 @@ textarea, input[type=text], input[type=number] {
 
   <footer class="foot">
     <p>Rooms, beds, and worker assignments are shared through the passcode-protected bed list. <button type="button" class="link" id="reset">Reset everything</button></p>
+    <p class="sync" id="sync-status" hidden></p>
   </footer>
 
   <script id="divide-logic">
@@ -959,6 +959,12 @@ textarea, input[type=text], input[type=number] {
     s.classList.toggle('error', !!isError);
   }
 
+  function formatSavedAt(iso) {
+    const d = iso ? new Date(iso) : new Date();
+    const stamp = isNaN(d) ? String(iso) : d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+    return `Saved ${stamp}`;
+  }
+
   // Use the Worker's saved state: its rooms, bed counts, workers and occupied beds.
   function applyShared(saved) {
     layout = parseLayout({ rooms: saved.rooms.map((r) => ({ room: r.room, beds: r.beds.map((b) => b.label) })) });
@@ -987,6 +993,7 @@ textarea, input[type=text], input[type=number] {
     } else {
       shared.shifts = null;
     }
+    if (saved.updatedAt) setSync(formatSavedAt(saved.updatedAt));
   }
 
   // The current layout, workers and bed states, in the Worker's format. Sent with
@@ -1011,14 +1018,12 @@ textarea, input[type=text], input[type=number] {
         shared.on = true;
         shared.workers = state.workers.map((w) => ({ ...w }));
         if (!shared.shifts) shared.shifts = JSON.parse(JSON.stringify(currentState().shifts));
-        if (!quiet) setSync('Shared: changes save for everyone.');
       } else if (!res.ok) {
         throw new Error(`error ${res.status}`);
       } else {
         const saved = await res.json();
         shared.on = true;
         if (saved.version !== shared.version && !pending.length && !saving) applyShared(saved);
-        if (!quiet) setSync('Shared: changes save for everyone.');
       }
       $('edit-toggle').hidden = false;
     } catch (e) {
@@ -1088,8 +1093,7 @@ textarea, input[type=text], input[type=number] {
       if (!res.ok) throw new Error(body.error || `error ${res.status}`);
       saving = false;
       if (!pending.length) applyShared(body);
-      const t = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-      setSync(`Saved for everyone at ${t}.`);
+      setSync(formatSavedAt(body && body.updatedAt));
       ok = true;
     } catch (e) {
       saving = false;
