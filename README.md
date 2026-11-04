@@ -25,7 +25,7 @@ Edit `rooms.json` on GitHub (open it, click the pencil, commit). The calculator 
 
 - `beds` is the number of beds (labelled A, B, C...), or a list of your own labels.
 - To add a room, copy a line and change the number. Every line except the last needs a comma.
-- If the file has a mistake, the page shows a red note saying what's wrong and uses its built-in list (37 rooms, 1 to 38 without 13, 2 beds each) until it's fixed.
+- If the file has a mistake, the page shows a red note saying what's wrong and uses its built-in copy of the room list until it's fixed.
 - GitHub Pages can take a few minutes to pick up a change.
 
 ## Run locally
