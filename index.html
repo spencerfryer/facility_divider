@@ -103,12 +103,13 @@ textarea, input[type=text], input[type=number] {
 .stepper button:last-child { border-radius: 0 8px 8px 0; }
 .stepper button { min-width: 44px; padding: 0; font-size: 1.2rem; }
 
-.worker-wrap { position: relative; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.worker-wrap { position: relative; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.shift-dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
 .icon-btn { width: 40px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
 .worker-pick {
-  display: inline-flex; align-items: center; gap: 6px;
+  display: inline-flex; align-items: center; gap: 8px;
   background: var(--bg); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: 3px 10px; min-height: 32px; font-weight: 650;
+  border-radius: 6px; padding: 4px 10px; min-height: 36px; font-size: 1.3rem; font-weight: 700;
 }
 .worker-pick:hover, .worker-pick[aria-expanded="true"] { border-color: var(--tab-active); }
 .worker-pick .caret { color: var(--muted); font-size: 0.78rem; line-height: 1; }
@@ -167,8 +168,8 @@ textarea, input[type=text], input[type=number] {
 .legend .key + .key, .legend .key:not(:first-child) { margin-left: 8px; }
 .census { flex-basis: 100%; }
 .assign-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.assign-list li { border: 1px solid var(--border); border-left: 6px solid; border-radius: 8px; padding: 10px 12px; }
-.assign-list .who { display: flex; justify-content: space-between; gap: 8px; font-weight: 650; }
+.assign-list li { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.assign-list .who { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 650; }
 .assign-list .count { color: var(--muted); font-weight: 500; white-space: nowrap; }
 .assign-list .range { font-size: 1.3rem; font-weight: 700; margin: 2px 0 0; }
 .assign-list .rooms, .assign-list .open { color: var(--muted); font-size: 0.9rem; margin: 2px 0 0; }
@@ -815,7 +816,6 @@ textarea, input[type=text], input[type=number] {
     const shiftColor = SHIFT_COLORS[tab()] || SHIFT_COLORS.AM;
     groups.forEach((g, i) => {
       const li = el('li');
-      li.style.borderLeftColor = shiftColor;
       const who = el('div', 'who');
       const wrap = el('div', 'worker-wrap');
       const pick = el('button', 'worker-pick');
@@ -823,7 +823,9 @@ textarea, input[type=text], input[type=number] {
       const isOpen = openMenuSlot === i;
       pick.setAttribute('aria-haspopup', 'listbox');
       pick.setAttribute('aria-expanded', String(isOpen));
-      pick.append(el('span', 'worker-label', staffName(i)), el('span', 'caret', '▾'));
+      const dot = el('span', 'shift-dot');
+      dot.style.background = shiftColor;
+      pick.append(dot, el('span', 'worker-label', staffName(i)), el('span', 'caret', '▾'));
       pick.addEventListener('click', (e) => {
         e.stopPropagation();
         openMenuSlot = openMenuSlot === i ? -1 : i;
