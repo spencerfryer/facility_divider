@@ -25,6 +25,7 @@
   --bed-line: #4a5360;
   --error: #ff7b72;
   --tool: #8f9fbc; /* accent blue at a quarter saturation, for the + and − buttons */
+  --tab-active: #7999d2; /* accent blue at half saturation, for the selected shift tab */
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -164,12 +165,13 @@ textarea, input[type=text], input[type=number] {
 .check input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
 .card .span { margin: 0; font-size: 0.9rem; color: var(--muted); }
 
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 12px 0 12px; }
+.tabs { display: flex; gap: 6px; padding: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; margin: 12px 0 14px; }
 .tabs [role=tab] {
-  background: transparent; color: var(--muted); border: 1px solid transparent; border-bottom: none;
-  border-radius: 8px 8px 0 0; min-width: 72px; font-weight: 650; margin-bottom: -1px;
+  flex: 1; background: transparent; color: var(--muted); border: 1px solid transparent;
+  border-radius: 7px; min-height: 44px; font-size: 1.05rem; font-weight: 700; letter-spacing: 0.02em;
 }
-.tabs [role=tab][aria-selected="true"] { color: var(--text); background: var(--bg); border-color: var(--border); border-bottom: 1px solid var(--bg); }
+.tabs [role=tab]:hover:not([aria-selected="true"]) { color: var(--text); border-color: var(--border); }
+.tabs [role=tab][aria-selected="true"] { color: var(--accent-text); background: var(--tab-active); border-color: var(--tab-active); }
 .shift-bar { justify-content: flex-start; }
 .shift-bar .actions { display: flex; gap: 8px; margin-left: auto; }
 .history { margin-top: 20px; }
