@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bed Divider</title>
+  <meta name="description" content="Split the occupied beds in a unit evenly among the staff on shift.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Bed Divider</h1>
+    <p class="sub">Mark which beds are occupied, set how many people are working, and get an even split.</p>
+  </header>
+
+  <main>
+    <section class="panel" aria-labelledby="beds-h">
+      <div class="panel-head">
+        <h2 id="beds-h">1. Beds</h2>
+        <button type="button" class="link" id="edit-beds-toggle" aria-expanded="false">Edit bed list</button>
+      </div>
+      <div id="bed-editor" class="bed-editor" hidden>
+        <label for="bed-list">Bed names in layout order. Use commas or new lines; ranges like <code>1-20</code> or <code>A1-A12</code> work.</label>
+        <textarea id="bed-list" rows="4" spellcheck="false"></textarea>
+        <div class="row">
+          <button type="button" id="apply-beds">Update beds</button>
+          <span class="hint">Occupied marks are kept for beds whose names don't change.</span>
+        </div>
+      </div>
+      <p class="hint">Tap a bed to mark it occupied or empty. <span id="census"></span></p>
+      <div class="row tight">
+        <button type="button" class="ghost" id="all-occ">All occupied</button>
+        <button type="button" class="ghost" id="all-empty">All empty</button>
+      </div>
+      <div id="bed-grid" class="bed-grid" role="group" aria-label="Beds"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="staff-h">
+      <h2 id="staff-h">2. Staff working</h2>
+      <div class="row">
+        <label for="staff-count" class="inline">Number of people</label>
+        <div class="stepper">
+          <button type="button" id="staff-minus" aria-label="One fewer">−</button>
+          <input id="staff-count" type="number" min="1" max="50" value="3" inputmode="numeric">
+          <button type="button" id="staff-plus" aria-label="One more">+</button>
+        </div>
+      </div>
+      <details class="names">
+        <summary>Add names (optional)</summary>
+        <div id="staff-names" class="staff-names"></div>
+      </details>
+    </section>
+
+    <section class="panel" aria-labelledby="result-h">
+      <div class="panel-head">
+        <h2 id="result-h">3. Assignments</h2>
+        <button type="button" class="ghost" id="print">Print</button>
+      </div>
+      <div id="results" class="results" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>Runs entirely in your browser. Nothing is sent anywhere; your bed list and names are saved on this device only. <button type="button" class="link" id="reset">Reset everything</button></p>
+  </footer>
+
+  <script src="js/divide.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
