@@ -194,9 +194,7 @@ textarea, input[type=text], input[type=number] {
         </div>
       </div>
       <details class="names">
-        <summary>More options</summary>
-        <label class="check"><input type="checkbox" id="split-rooms"> Allow a room's beds to be split between workers (more even counts, but roommates can end up with different workers)</label>
-        <p class="hint">Worker names (optional)</p>
+        <summary>Add worker names (optional)</summary>
         <div id="staff-names" class="staff-names"></div>
       </details>
     </section>
@@ -290,73 +288,6 @@ textarea, input[type=text], input[type=number] {
 
 
   /**
-   * Room-aware split: rooms are never split between staff. Rooms stay in list
-   * order and each person gets a contiguous run of rooms. Among all ways to do
-   * that, pick the one with the most even patient counts (smallest sum of
-   * squared loads). Empty rooms sitting between two people's blocks go to the
-   * earlier person, like empty beds do in divideBeds.
-   *
-   * @param {{name: string, beds: {id: string, occupied: boolean}[]}[]} rooms
-   * @param {number} staffCount
-   * @returns {{groups: {rooms: string[], occupied: string[], empty: string[]}[]}}
-   */
-  function divideRooms(rooms, staffCount) {
-    const k = Math.max(0, Math.floor(Number(staffCount) || 0));
-    const n = rooms.length;
-    const load = rooms.map((r) => r.beds.filter((b) => b.occupied).length);
-    const total = load.reduce((a, b) => a + b, 0);
-
-    // cuts[g] = index of the first room in group g; cuts[k] = n.
-    let cuts;
-    if (k === 0) {
-      return { groups: [] };
-    } else if (total === 0) {
-      // No patients: spread the rooms evenly so everyone has some for admissions.
-      cuts = [0];
-      evenSizes(n, k).forEach((s, g) => cuts.push(cuts[g] + s));
-    } else {
-      const P = [0];
-      load.forEach((l, i) => P.push(P[i] + l));
-      const INF = Infinity;
-      // dp[j][i]: best cost putting the first i rooms into j groups.
-      const dp = [];
-      const from = [];
-      for (let j = 0; j <= k; j++) { dp.push(new Array(n + 1).fill(INF)); from.push(new Array(n + 1).fill(0)); }
-      dp[0][0] = 0;
-      for (let j = 1; j <= k; j++) {
-        for (let i = 0; i <= n; i++) {
-          for (let a = 0; a <= i; a++) {
-            if (dp[j - 1][a] === INF) continue;
-            const s = P[i] - P[a];
-            const c = dp[j - 1][a] + s * s;
-            if (c < dp[j][i]) { dp[j][i] = c; from[j][i] = a; }
-          }
-        }
-      }
-      cuts = new Array(k + 1);
-      cuts[k] = n;
-      for (let j = k; j >= 1; j--) cuts[j - 1] = from[j][cuts[j]];
-      // Move empty rooms at the start of a block back to the previous person,
-      // as long as the block keeps at least one room with patients.
-      for (let g = 1; g < k; g++) {
-        const hasPatients = (a, b) => P[b] - P[a] > 0;
-        while (cuts[g] < cuts[g + 1] && load[cuts[g]] === 0 && hasPatients(cuts[g] + 1, cuts[g + 1])) cuts[g]++;
-      }
-    }
-
-    const groups = [];
-    for (let g = 0; g < k; g++) {
-      const grp = { rooms: [], occupied: [], empty: [] };
-      for (let i = cuts[g]; i < cuts[g + 1]; i++) {
-        grp.rooms.push(rooms[i].name);
-        rooms[i].beds.forEach((b) => (b.occupied ? grp.occupied : grp.empty).push(b.id));
-      }
-      groups.push(grp);
-    }
-    return { groups };
-  }
-
-  /**
    * Turn free text into bed ids. Accepts commas or newlines, and ranges like
    * "1-20" or "A1-A12" (same prefix, numeric suffix).
    */
@@ -411,14 +342,14 @@ textarea, input[type=text], input[type=number] {
     });
   }
 
-  const api = { evenSizes, divideBeds, divideRooms, parseBedList, parseLayout };
+  const api = { evenSizes, divideBeds, parseBedList, parseLayout };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Divider = api;
 })(typeof self !== 'undefined' ? self : this);
   </script>
   <script>
 (function () {
-  const { divideBeds, divideRooms } = window.Divider;
+  const { divideBeds } = window.Divider;
   const { parseLayout } = window.Divider;
   const STORE = 'bed-divider:v6';
   // Used only if rooms.json can't be loaded (for example when this page is
@@ -430,7 +361,7 @@ textarea, input[type=text], input[type=number] {
   const color = (i) => COLORS[i % COLORS.length];
 
   // Beds default to occupied; we remember which ones were tapped empty.
-  const defaults = () => ({ empty: {}, staffCount: 4, names: [], splitRooms: false });
+  const defaults = () => ({ empty: {}, staffCount: 4, names: [] });
 
   let state = load();
   let layout = parseLayout(FALLBACK_LAYOUT);
@@ -499,11 +430,8 @@ textarea, input[type=text], input[type=number] {
   function update() {
     const rooms = buildRooms();
     const allBeds = rooms.flatMap((r) => r.beds);
-    const roomOfBed = {};
-    rooms.forEach((r) => r.beds.forEach((b) => { roomOfBed[b.id] = r.name; }));
-    const { groups } = state.splitRooms
-      ? divideBeds(allBeds, state.staffCount)
-      : divideRooms(rooms, state.staffCount);
+    // Split only the occupied beds, in order, regardless of room.
+    const { groups } = divideBeds(allBeds, state.staffCount);
 
     // Room grid
     grid.innerHTML = '';
@@ -542,15 +470,15 @@ textarea, input[type=text], input[type=number] {
       who.append(el('span', null, staffName(i)),
                  el('span', 'count', `${g.occupied.length} patient${g.occupied.length === 1 ? '' : 's'}`));
       li.append(who);
-      const ids = [...g.occupied, ...g.empty].sort((x, y) => bedOrder.indexOf(x) - bedOrder.indexOf(y));
-      if (!ids.length) {
-        li.append(el('p', 'range', 'No beds'));
+      const occ = g.occupied;
+      if (!occ.length) {
+        li.append(el('p', 'range', 'No patients'));
       } else {
-        const first = ids[0], last = ids[ids.length - 1];
+        const first = occ[0], last = occ[occ.length - 1];
         li.append(el('p', 'range', first === last ? `Bed ${first}` : `Beds ${first} – ${last}`));
-        const roomNames = g.rooms || [...new Set(ids.map((id) => roomOfBed[id]))];
-        li.append(el('p', 'rooms', roomNames.length === 1 ? `Room ${roomNames[0]}` : `Rooms ${roomNames[0]} – ${roomNames[roomNames.length - 1]} (${roomNames.length} rooms)`));
-        if (g.empty.length) li.append(el('p', 'open', `Empty in this range: ${g.empty.join(', ')}`));
+        const a = bedOrder.indexOf(first), b = bedOrder.indexOf(last);
+        const skipped = bedOrder.slice(a, b + 1).filter((id) => !occ.includes(id));
+        if (skipped.length) li.append(el('p', 'open', `Skip (empty): ${skipped.join(', ')}`));
       }
       results.append(li);
     });
@@ -587,9 +515,6 @@ textarea, input[type=text], input[type=number] {
 
   $('all-occ').addEventListener('click', () => { state.empty = {}; update(); });
 
-  const split = $('split-rooms');
-  split.checked = !!state.splitRooms;
-  split.addEventListener('change', () => { state.splitRooms = split.checked; update(); });
 
   countInput.addEventListener('change', () => setStaffCount(countInput.value));
   $('staff-minus').addEventListener('click', () => setStaffCount(state.staffCount - 1));
@@ -598,7 +523,6 @@ textarea, input[type=text], input[type=number] {
   $('reset').addEventListener('click', () => {
     if (!confirm('Mark every bed occupied again and clear worker names?')) return;
     state = defaults();
-    split.checked = false;
     namesBox.innerHTML = '';
     setStaffCount(state.staffCount);
   });
