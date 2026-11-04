@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#7c3aed"/>
+  <g fill="#ffffff">
+    <!-- Headboard (left post) -->
+    <rect x="64" y="136" width="36" height="240" rx="18"/>
+    <!-- Pillow / head -->
+    <circle cx="156" cy="222" r="34"/>
+    <!-- Blanket / mattress dome -->
+    <path d="M212 192h164c39.8 0 72 32.2 72 72v24H212v-96z"/>
+    <!-- Bed frame horizontal bar -->
+    <rect x="64" y="284" width="384" height="36" rx="12"/>
+    <!-- Footboard (right leg) -->
+    <rect x="412" y="264" width="36" height="112" rx="18"/>
+  </g>
+</svg>
