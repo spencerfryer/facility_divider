@@ -15,9 +15,9 @@
  *       ...
  *     ],
  *     "shifts": {
- *       "AM":  { "workers": 4, "extras": [true, false, false, false] },
- *       "PM":  { "workers": 3, "extras": [] },
- *       "NOC": { "workers": 2, "extras": [] }
+ *       "AM":  { "workers": 4, "ids": ["am-cecile", "am-daniel", "am-doris", "am-eduardo"], "extras": [true, false, false, false] },
+ *       "PM":  { "workers": 3, "ids": ["pm-alice", "pm-ariel", "pm-cristina-d"], "extras": [] },
+ *       "NOC": { "workers": 2, "ids": ["noc-abiola", "noc-amleset"], "extras": [] }
  *     }
  *   }
  *
@@ -149,6 +149,7 @@ export function cleanState(s) {
     const sh = (s.shifts && s.shifts[name]) || {};
     shifts[name] = {
       workers: clampWorkers(sh.workers ?? 4),
+      ids: Array.isArray(sh.ids) ? sh.ids.slice(0, MAX_WORKERS).map((id) => String(id || '').trim().slice(0, 40)).filter(Boolean) : [],
       extras: Array.isArray(sh.extras) ? sh.extras.slice(0, MAX_WORKERS).map(Boolean) : [],
     };
   }
@@ -167,7 +168,7 @@ export function cleanState(s) {
  *   { op: "addBed", room: "12" }       adds the next letter, up to MAX_BEDS; new bed starts occupied
  *   { op: "removeBed", room: "12" }    removes the room's last bed, keeps at least one
  *   { op: "setAll", occupied: true }   marks every bed occupied (or empty)
- *   { op: "setWorkers", shift: "AM", workers: 4 }
+ *   { op: "setWorkers", shift: "AM", workers: 4, ids: ["am1", ...] }
  *   { op: "finalize", shift: "AM", counts: [13, 13, 12], workerIds: ["am1", ...] }
  */
 export function applyOps(state, ops) {
@@ -205,7 +206,10 @@ export function applyOps(state, ops) {
         break;
       case 'setWorkers': {
         if (!SHIFTS.includes(o.shift)) throw new Error(`no shift ${o.shift}`);
-        s.shifts[o.shift].workers = clampWorkers(o.workers);
+        if (o.workers != null) s.shifts[o.shift].workers = clampWorkers(o.workers);
+        if (Array.isArray(o.ids)) {
+          s.shifts[o.shift].ids = o.ids.slice(0, MAX_WORKERS).map((id) => String(id || '').trim().slice(0, 40)).filter(Boolean);
+        }
         break;
       }
       case 'finalize': {

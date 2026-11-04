@@ -76,10 +76,14 @@ test('bad changes are rejected without saving', async () => {
   assert.strictEqual((await (await call(env, 'GET', '/state')).json()).version, 1);
 });
 
-test('worker counts are saved per shift', () => {
-  let s = applyOps(seed(), [{ op: 'setWorkers', shift: 'PM', workers: 3 }, { op: 'setWorkers', shift: 'NOC', workers: 99 }]);
+test('worker counts and selected worker ids are saved per shift', () => {
+  let s = applyOps(seed(), [
+    { op: 'setWorkers', shift: 'PM', workers: 3, ids: ['pm-alice', 'pm-ariel', 'pm-finta'] },
+    { op: 'setWorkers', shift: 'NOC', workers: 99 },
+  ]);
   assert.strictEqual(s.shifts.AM.workers, 4);
   assert.strictEqual(s.shifts.PM.workers, 3);
+  assert.deepStrictEqual(s.shifts.PM.ids, ['pm-alice', 'pm-ariel', 'pm-finta']);
   assert.strictEqual(s.shifts.NOC.workers, 50);
   assert.throws(() => applyOps(s, [{ op: 'setWorkers', shift: 'LATE', workers: 2 }]), /no shift LATE/);
 });

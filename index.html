@@ -653,6 +653,9 @@ textarea, input[type=text], input[type=number] {
   const workers = () => (sharedShift() || local()).workers;
   const assignedIds = () => {
     local().workers = workers();
+    if (sharedShift() && Array.isArray(sharedShift().ids) && sharedShift().ids.length) {
+      local().ids = sharedShift().ids.slice();
+    }
     syncShiftIds(local(), tab());
     return local().ids;
   };
@@ -686,7 +689,8 @@ textarea, input[type=text], input[type=number] {
       syncShiftIds(local(), tab());
       if (sharedShift()) {
         sharedShift().workers = n;
-        queue({ op: 'setWorkers', shift: tab(), workers: n });
+        sharedShift().ids = local().ids.slice();
+        queue({ op: 'setWorkers', shift: tab(), workers: n, ids: local().ids.slice() });
       }
     }
     openMenuSlot = -1;
@@ -701,6 +705,10 @@ textarea, input[type=text], input[type=number] {
       ids[otherIdx] = ids[slotIdx];
     }
     ids[slotIdx] = chosenId;
+    if (sharedShift()) {
+      sharedShift().ids = ids.slice();
+      queue({ op: 'setWorkers', shift: tab(), workers: n, ids: ids.slice() });
+    }
     openMenuSlot = -1;
     update();
   }
@@ -968,6 +976,14 @@ textarea, input[type=text], input[type=number] {
     // A Worker without shift support yet: keep counts and history on this device.
     if (saved.shifts && SHIFTS.every((n) => saved.shifts[n])) {
       shared.shifts = saved.shifts;
+      for (const n of SHIFTS) {
+        state.shifts[n].workers = saved.shifts[n].workers;
+        if (Array.isArray(saved.shifts[n].ids) && saved.shifts[n].ids.length) {
+          state.shifts[n].ids = saved.shifts[n].ids.slice();
+        }
+        syncShiftIds(state.shifts[n], n);
+        shared.shifts[n].ids = state.shifts[n].ids.slice();
+      }
     } else {
       shared.shifts = null;
     }
@@ -981,6 +997,7 @@ textarea, input[type=text], input[type=number] {
       workers: workerPool().map((w) => ({ id: w.id, name: w.name, shift: w.shift, extra: !!w.extra })),
       shifts: Object.fromEntries(SHIFTS.map((n) => [n, {
         workers: state.shifts[n].workers,
+        ids: state.shifts[n].ids,
         extras: state.shifts[n].extras,
       }])),
     };
@@ -1192,7 +1209,17 @@ textarea, input[type=text], input[type=number] {
       });
       syncShiftIds(state.shifts[n], n);
     }
-    if (shared.on) { shared.empty = {}; queue({ op: 'setAll', occupied: true }); }
+    if (shared.on) {
+      shared.empty = {};
+      queue({ op: 'setAll', occupied: true });
+      for (const n of SHIFTS) {
+        if (shared.shifts && shared.shifts[n]) {
+          shared.shifts[n].workers = state.shifts[n].workers;
+          shared.shifts[n].ids = state.shifts[n].ids.slice();
+        }
+        queue({ op: 'setWorkers', shift: n, workers: state.shifts[n].workers, ids: state.shifts[n].ids.slice() });
+      }
+    }
     openMenuSlot = -1;
     update();
   });
