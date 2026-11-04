@@ -105,8 +105,49 @@ test('rooms.json is valid: 37 rooms, no room 13', () => {
   assert.ok(!rooms.some((r) => r.name === '13'));
 });
 
-const { pickExtras, nextFlags } = Object.fromEntries(
+const { pickExtras, nextFlags, parseWorkers, nextWorkerExtras } = Object.fromEntries(
   Object.entries(sandbox.self.Divider).map(([k, fn]) => [k, wrap(fn)]));
+
+test('workers.json is valid and parses into alphabetized AM, PM, NOC, On Call workers with unique ids', () => {
+  const data = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'workers.json'), 'utf8'));
+  const pool = parseWorkers(data);
+  assert.ok(Array.isArray(pool) && pool.length >= 4);
+  for (const shift of ['AM', 'PM', 'NOC', 'On Call']) {
+    const group = pool.filter((w) => w.shift === shift);
+    assert.ok(group.length >= 1);
+    assert.ok(group.every((w) => typeof w.id === 'string' && w.id && typeof w.name === 'string' && w.name && w.extra === false));
+    const names = group.map((w) => w.name);
+    const sorted = [...names].sort((a, b) => a.localeCompare(b));
+    assert.deepStrictEqual(names, sorted);
+  }
+});
+
+test('nextWorkerExtras tracks extras per worker across changing lineups and cross-shift fill-ins', () => {
+  let pool = [
+    { id: 'am1', name: 'Alex', shift: 'AM', extra: false },
+    { id: 'am2', name: 'Bri', shift: 'AM', extra: false },
+    { id: 'am3', name: 'Casey', shift: 'AM', extra: false },
+    { id: 'pm1', name: 'Jordan', shift: 'PM', extra: false },
+  ];
+  const extrasOf = (list) => Object.fromEntries(list.map((w) => [w.id, w.extra]));
+
+  // Day 1 (AM): am1, am2, pm1 (filling in from PM) work; pm1 gets extra (3, 3, 4)
+  pool = nextWorkerExtras(pool, 'AM', ['am1', 'am2', 'pm1'], [3, 3, 4]);
+  assert.deepStrictEqual(extrasOf(pool), { am1: false, am2: false, am3: false, pm1: true });
+
+  // Day 2 (AM): am1, am2, am3 work; am1 & am2 get extra (4, 4, 3) -> pm1 still retains extra!
+  pool = nextWorkerExtras(pool, 'AM', ['am1', 'am2', 'am3'], [4, 4, 3]);
+  assert.deepStrictEqual(extrasOf(pool), { am1: true, am2: true, am3: false, pm1: true });
+
+  // Day 3 (AM): am1, am2, am3 work; am3 gets extra (3, 3, 4) -> all AM workers have had extra, AM resets, pm1 still keeps extra!
+  pool = nextWorkerExtras(pool, 'AM', ['am1', 'am2', 'am3'], [3, 3, 4]);
+  assert.deepStrictEqual(extrasOf(pool), { am1: false, am2: false, am3: false, pm1: true });
+
+  // If an active lineup all has extra=true (e.g. pm1 fills in with others who have extra), it resets so they can rotate
+  pool = pool.map((w) => ({ ...w, extra: true }));
+  pool = nextWorkerExtras(pool, 'AM', ['am1', 'am2', 'pm1'], [3, 3, 4]);
+  assert.deepStrictEqual(extrasOf(pool), { am1: false, am2: false, am3: true, pm1: true });
+});
 
 test('extras skip workers who already had one this round', () => {
   assert.deepStrictEqual(evenSizes(10, 3, [true, false, false]), [3, 4, 3]);

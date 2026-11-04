@@ -103,11 +103,38 @@ textarea, input[type=text], input[type=number] {
 .stepper button:last-child { border-radius: 0 8px 8px 0; }
 .stepper button { min-width: 44px; padding: 0; font-size: 1.2rem; }
 
-.names .check { margin-top: 10px; }
-.names summary { cursor: pointer; color: var(--accent); margin-top: 4px; }
-.staff-names { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-top: 10px; }
-.staff-names label { display: flex; align-items: center; gap: 8px; }
-.swatch { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.worker-wrap { position: relative; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.worker-pick {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 3px 10px; min-height: 32px; font-weight: 650;
+}
+.worker-pick:hover, .worker-pick[aria-expanded="true"] { border-color: var(--tab-active); }
+.worker-pick .caret { color: var(--muted); font-size: 0.78rem; line-height: 1; }
+.worker-menu {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 30;
+  min-width: 210px; max-height: 300px; overflow-y: auto;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 4px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.worker-group-label {
+  font-size: 0.72rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 6px 10px 2px;
+}
+.worker-group-label:not(:first-child) {
+  border-top: 1px solid var(--border); margin-top: 4px; padding-top: 6px;
+}
+.worker-opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; background: transparent; color: var(--text); border: 1px solid transparent;
+  border-radius: 6px; padding: 7px 10px; min-height: 36px; text-align: left; font-weight: 600;
+}
+.worker-opt:hover { background: var(--surface); }
+.worker-opt[aria-selected="true"] { background: var(--surface); border-color: var(--tab-active); }
+.worker-opt .slot-note { font-size: 0.75rem; font-weight: 500; color: var(--muted); }
 
 .results { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .card { border: 1px solid var(--border); border-left: 6px solid; border-radius: 8px; padding: 10px 12px; }
@@ -185,7 +212,8 @@ textarea, input[type=text], input[type=number] {
 
 @media print {
   body { background: #fff; color: #000; }
-  .top .sub, .row, .hint, .names, .tabs, .history, #finalize-status, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type { display: none !important; }
+  .top .sub, .row, .hint, .worker-menu, .worker-pick .caret, .tabs, .history, #finalize-status, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type { display: none !important; }
+  .worker-pick { border: none; background: none; color: #000; padding: 0; min-height: 0; }
   .panel { border: none; padding: 0; margin: 8px 0; }
   .panel > h2 { display: none; }
   .print-only { display: block; margin: 0 0 8px; }
@@ -239,10 +267,7 @@ textarea, input[type=text], input[type=number] {
           </div>
         </div>
         <p class="sync" id="finalize-status" hidden></p>
-        <details class="names">
-          <summary>Add worker names (optional)</summary>
-          <div id="staff-names" class="staff-names"></div>
-        </details>
+        <p class="hint">Click on worker name to assign or change worker</p>
         <ol id="results" class="assign-list" aria-live="polite"></ol>
         <div class="history">
           <h3 id="history-h">Last 7 finalized</h3>
@@ -254,7 +279,7 @@ textarea, input[type=text], input[type=number] {
   </main>
 
   <footer class="foot">
-    <p>Rooms, beds, worker counts and finalized history are shared through the passcode-protected bed list. Worker names stay on this device only. <button type="button" class="link" id="reset">Reset everything</button></p>
+    <p>Rooms, beds, worker assignments and finalized history are shared through the passcode-protected bed list. <button type="button" class="link" id="reset">Reset everything</button></p>
   </footer>
 
   <script id="divide-logic">
@@ -425,15 +450,80 @@ textarea, input[type=text], input[type=number] {
     });
   }
 
-  const api = { evenSizes, pickExtras, nextFlags, divideBeds, parseBedList, parseLayout };
+  /**
+   * Read the worker lists from workers.json:
+   *   { "AM": [{ "id": "am1", "name": "Alex" }, ...], "PM": [...], "NOC": [...], "On Call": [...] }
+   * Returns a flat list of `{ id, name, shift, extra }` alphabetized within each shift.
+   */
+  function parseWorkers(data) {
+    if (!data || typeof data !== 'object') throw new Error('workers.json needs AM, PM and NOC worker lists.');
+    const seenIds = new Set();
+    const out = [];
+    for (const shift of ['AM', 'PM', 'NOC', 'On Call']) {
+      const list = data[shift];
+      if (shift === 'On Call' && list == null) continue;
+      if (!Array.isArray(list)) throw new Error(`workers.json needs a "${shift}" list.`);
+      const slug = shift.toLowerCase().replace(/\s+/g, '');
+      const group = list.map((w, i) => {
+        const isStr = typeof w === 'string';
+        const name = isStr ? w.trim() : (w && typeof w.name === 'string' ? w.name.trim() : '');
+        const id = isStr ? `${slug}-${name}` : (w && w.id != null ? String(w.id).trim() : `${slug}-${name}`);
+        if (!name) throw new Error(`${shift} worker #${i + 1} in workers.json has no "name".`);
+        if (!id) throw new Error(`${shift} worker "${name}" in workers.json has no "id".`);
+        if (seenIds.has(id)) throw new Error(`Worker id "${id}" is listed twice in workers.json.`);
+        seenIds.add(id);
+        return { id, name, shift, extra: !!(w && w.extra) };
+      });
+      group.sort((a, b) => a.name.localeCompare(b.name));
+      out.push(...group);
+    }
+    if (!out.length) throw new Error('workers.json needs at least one worker.');
+    return out;
+  }
+
+  /**
+   * Updates per-worker `extra` status across the facility worker pool after a finalize.
+   * Workers can fill in from any shift and retain or lose their `extra` status.
+   */
+  function nextWorkerExtras(workers, shift, assignedIds, counts) {
+    if (!Array.isArray(workers) || !workers.length) return [];
+    const out = workers.map((w) => ({ id: String(w.id), name: String(w.name), shift: w.shift, extra: !!w.extra }));
+    const byId = new Map(out.map((w) => [w.id, w]));
+    const ids = Array.isArray(assignedIds) ? assignedIds.slice(0, counts.length) : [];
+    const active = ids.map((id) => byId.get(id)).filter(Boolean);
+    if (active.length && active.every((w) => w.extra)) {
+      active.forEach((w) => { w.extra = false; });
+    }
+    const hadBefore = new Set(out.filter((w) => w.extra).map((w) => w.id));
+    const min = Math.min(...counts);
+    const gotSecond = new Set();
+    counts.forEach((c, i) => {
+      if (c > min) {
+        const w = byId.get(ids[i]);
+        if (w) {
+          if (hadBefore.has(w.id)) gotSecond.add(w.id);
+          w.extra = true;
+        }
+      }
+    });
+    const shiftPool = out.filter((w) => w.shift === shift);
+    if (shiftPool.length && shiftPool.every((w) => w.extra)) {
+      shiftPool.forEach((w) => { w.extra = gotSecond.has(w.id); });
+    }
+    if (active.length && active.every((w) => w.extra)) {
+      active.forEach((w) => { w.extra = gotSecond.has(w.id); });
+    }
+    return out;
+  }
+
+  const api = { evenSizes, pickExtras, nextFlags, nextWorkerExtras, divideBeds, parseBedList, parseLayout, parseWorkers };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Divider = api;
 })(typeof self !== 'undefined' ? self : this);
   </script>
   <script>
 (function () {
-  const { divideBeds } = window.Divider;
-  const { parseLayout, nextFlags } = window.Divider;
+  const { divideBeds, parseLayout, parseWorkers, nextFlags, nextWorkerExtras } = window.Divider;
   const STORE = 'bed-divider:v6';
   // Address of the Cloudflare Worker that stores the shared layout and bed
   // states (see worker/README.md). Leave empty to keep everything on this
@@ -444,6 +534,35 @@ textarea, input[type=text], input[type=number] {
   // Used only if rooms.json can't be loaded (for example when this page is
   // opened straight from a file instead of from the website).
   const FALLBACK_LAYOUT = { rooms: [{ room: "1", beds: ["A", "B", "C"] }, { room: "2", beds: ["A", "B", "C"] }, { room: "3", beds: ["A", "B"] }, { room: "4", beds: ["A", "B"] }, { room: "5", beds: ["A", "B", "C"] }, { room: "6", beds: ["A", "B"] }, { room: "7", beds: ["A", "B"] }, { room: "8", beds: ["A", "B", "C"] }, { room: "9", beds: ["A", "B"] }, { room: "10", beds: ["A", "B", "C"] }, { room: "11", beds: ["A", "B"] }, { room: "12", beds: ["A", "B", "C"] }, { room: "14", beds: ["A", "B", "C"] }, { room: "15", beds: ["A", "B"] }, { room: "16", beds: ["A", "B"] }, { room: "17", beds: ["A", "B"] }, { room: "18", beds: ["A", "B", "C"] }, { room: "19", beds: ["A", "B", "C"] }, { room: "20", beds: ["A", "B", "C"] }, { room: "21", beds: ["A", "B", "C"] }, { room: "22", beds: ["A", "B"] }, { room: "23", beds: ["A", "B"] }, { room: "24", beds: ["A", "B"] }, { room: "25", beds: ["A", "B"] }, { room: "26", beds: ["A", "B", "C"] }, { room: "27", beds: ["A", "B", "C"] }, { room: "28", beds: ["A", "B", "C"] }, { room: "29", beds: ["A", "B", "C"] }, { room: "30", beds: ["A", "B", "C"] }, { room: "31", beds: ["A", "B", "C"] }, { room: "32", beds: ["A", "B", "C"] }, { room: "33", beds: ["A", "B"] }, { room: "34", beds: ["A", "B", "C"] }, { room: "35", beds: ["A", "B"] }, { room: "36", beds: ["A", "B", "C"] }, { room: "37", beds: ["A", "B", "C"] }, { room: "38", beds: ["A", "B", "C"] }] };
+  const FALLBACK_WORKERS = {
+    AM: [
+      { id: "am-cecile", name: "Cecile" }, { id: "am-daniel", name: "Daniel" }, { id: "am-doris", name: "Doris" },
+      { id: "am-eduardo", name: "Eduardo" }, { id: "am-erma", name: "Erma" }, { id: "am-genet", name: "Genet" },
+      { id: "am-hiwot", name: "Hiwot" }, { id: "am-james", name: "James" }, { id: "am-jeanette", name: "Jeanette" },
+      { id: "am-jeanpaul", name: "Jeanpaul" }, { id: "am-mischelle", name: "Mischelle" }, { id: "am-nataly", name: "Nataly" },
+      { id: "am-obiamaka", name: "Obiamaka" }, { id: "am-prisca", name: "Prisca" }, { id: "am-sergio", name: "Sergio" },
+      { id: "am-sewalem", name: "Sewalem" }, { id: "am-shirley", name: "Shirley" }, { id: "am-tara", name: "Tara" },
+      { id: "am-tj", name: "TJ" }, { id: "am-victoria", name: "Victoria" }, { id: "am-wendell", name: "Wendell" },
+    ],
+    PM: [
+      { id: "pm-alice", name: "Alice" }, { id: "pm-ariel", name: "Ariel" }, { id: "pm-cristina-d", name: "Cristina D" },
+      { id: "pm-finta", name: "Finta" }, { id: "pm-grace", name: "Grace" }, { id: "pm-kafilat", name: "Kafilat" },
+      { id: "pm-luan", name: "Luan" }, { id: "pm-nnenna", name: "Nnenna" }, { id: "pm-qing", name: "Qing" },
+      { id: "pm-rita", name: "Rita" }, { id: "pm-veronica", name: "Veronica" },
+    ],
+    NOC: [
+      { id: "noc-abiola", name: "Abiola" }, { id: "noc-amleset", name: "Amleset" }, { id: "noc-arlene", name: "Arlene" },
+      { id: "noc-barbara", name: "Barbara" }, { id: "noc-blessing", name: "Blessing" }, { id: "noc-elizabeth", name: "Elizabeth" },
+      { id: "noc-giscard", name: "Giscard" }, { id: "noc-jaylon", name: "Jaylon" }, { id: "noc-worknesh", name: "Worknesh" },
+    ],
+    "On Call": [
+      { id: "oncall-amir", name: "Amir" }, { id: "oncall-animut", name: "Animut" }, { id: "oncall-annette", name: "Annette" },
+      { id: "oncall-cristina-p", name: "Cristina P" }, { id: "oncall-edgardo", name: "Edgardo" }, { id: "oncall-hossain", name: "Hossain" },
+      { id: "oncall-ifeoma", name: "Ifeoma" }, { id: "oncall-jose", name: "Jose" }, { id: "oncall-kala", name: "Kala" },
+      { id: "oncall-mulu", name: "Mulu" }, { id: "oncall-nataly", name: "Nataly" }, { id: "oncall-pramanik", name: "Pramanik" },
+      { id: "oncall-yeshimebet", name: "Yeshimebet" }, { id: "oncall-zailyah", name: "Zailyah" },
+    ],
+  };
   // Distinct colors that keep white text readable.
   const COLORS = ['#1f6feb', '#d1453b', '#1a7f37', '#8250df', '#bc4c00', '#0a7d8c', '#bf3989', '#6e7781',
                   '#9a6700', '#0550ae', '#a40e26', '#116329', '#6639ba', '#953800', '#1b7c83', '#99286e'];
@@ -452,28 +571,80 @@ textarea, input[type=text], input[type=number] {
   // Beds default to occupied; we remember which ones were tapped empty.
   const SHIFTS = ['AM', 'PM', 'NOC'];
   const HISTORY_LENGTH = 7;
-  const newShifts = () => Object.fromEntries(SHIFTS.map((n) => [n, { workers: 4, names: [], history: [], extras: [] }]));
-  const defaults = () => ({ empty: {}, tab: 'AM', shifts: newShifts() });
+  let allWorkers = parseWorkers(FALLBACK_WORKERS);
+  const shiftDefaultIds = (shiftName, count) => {
+    const first = allWorkers.filter((w) => w.shift === shiftName);
+    const rest = allWorkers.filter((w) => w.shift !== shiftName);
+    return first.concat(rest).slice(0, count).map((w) => w.id);
+  };
+  const newShifts = () => Object.fromEntries(SHIFTS.map((n) => [n, {
+    workers: 4,
+    ids: shiftDefaultIds(n, 4),
+    history: [],
+    extras: [],
+  }]));
+  const defaults = () => ({ empty: {}, tab: 'AM', workers: allWorkers.map((w) => ({ ...w })), shifts: newShifts() });
 
   let state = load();
   let layout = parseLayout(FALLBACK_LAYOUT);
   // Shared mode: the Worker's copy of which beds are empty, keyed by bed id.
-  let shared = { on: false, version: 0, empty: {}, shifts: null };
+  let shared = { on: false, version: 0, empty: {}, workers: null, shifts: null };
   let editing = false;
+  let openMenuSlot = -1;
   const pending = [];        // changes waiting to be sent to the Worker
   let flushTimer = null;
   let saving = false;
+
+  function workerPool() {
+    return (shared.on && Array.isArray(shared.workers) && shared.workers.length) ? shared.workers : state.workers;
+  }
+
+  function mergeWorkers(baseList, savedList) {
+    const savedExtra = new Map(Array.isArray(savedList) ? savedList.map((w) => [w.id, !!w.extra]) : []);
+    return baseList.map((w) => ({
+      id: w.id,
+      name: w.name,
+      shift: w.shift,
+      extra: savedExtra.has(w.id) ? savedExtra.get(w.id) : !!w.extra,
+    }));
+  }
+
+  // Ensure each slot on the shift has a unique valid worker id from the facility pool.
+  function syncShiftIds(sh, shiftName) {
+    const pool = workerPool();
+    const valid = new Set(pool.map((w) => w.id));
+    const raw = Array.isArray(sh.ids) && sh.ids.length ? sh.ids : [];
+    const count = Math.max(1, sh.workers || 4);
+    const out = [];
+    const used = new Set();
+    for (let i = 0; i < count; i++) {
+      const c = String(raw[i] || '').trim();
+      if (c && valid.has(c) && !used.has(c)) { out.push(c); used.add(c); }
+      else out.push('');
+    }
+    const ordered = pool.filter((w) => w.shift === shiftName).concat(pool.filter((w) => w.shift !== shiftName));
+    for (let i = 0; i < count; i++) {
+      if (!out[i]) {
+        const next = ordered.find((w) => !used.has(w.id));
+        if (next) { out[i] = next.id; used.add(next.id); }
+        else out[i] = `slot-${i + 1}`;
+      }
+    }
+    sh.ids = out;
+    delete sh.names; delete sh.assigned; delete sh.roster; delete sh.hadExtra;
+  }
 
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(STORE));
       if (s && typeof s === 'object') {
         const out = Object.assign(defaults(), s);
+        out.workers = mergeWorkers(allWorkers, s.workers);
         out.shifts = newShifts();
-        for (const n of SHIFTS) Object.assign(out.shifts[n], (s.shifts && s.shifts[n]) || {});
-        // Older saves had one worker count and name list: they become the AM shift's.
-        if (!s.shifts && s.staffCount) { out.shifts.AM.workers = s.staffCount; out.shifts.AM.names = s.names || []; }
-        delete out.staffCount; delete out.names;
+        for (const n of SHIFTS) {
+          Object.assign(out.shifts[n], (s.shifts && s.shifts[n]) || {});
+          syncShiftIds(out.shifts[n], n);
+        }
         if (!SHIFTS.includes(out.tab)) out.tab = 'AM';
         return out;
       }
@@ -488,18 +659,30 @@ textarea, input[type=text], input[type=number] {
   const grid = $('room-grid');
   const results = $('results');
   const countInput = $('staff-count');
-  const namesBox = $('staff-names');
 
-  // The open tab's settings. Worker counts and history come from the shared
-  // bed list when it's on; names always stay on this device.
+  // The open tab's settings.
   const tab = () => state.tab;
   const local = () => state.shifts[tab()];
   const sharedShift = () => (shared.on && shared.shifts ? shared.shifts[tab()] : null);
   const workers = () => (sharedShift() || local()).workers;
   const history = () => (sharedShift() || local()).history;
-  // Worker positions that already had an extra patient this round.
-  const extras = () => (sharedShift() || local()).extras || [];
-  const staffName = (i) => (local().names[i] || '').trim() || `Worker ${i + 1}`;
+  const assignedIds = () => {
+    local().workers = workers();
+    syncShiftIds(local(), tab());
+    return local().ids;
+  };
+  const staffId = (i) => assignedIds()[i] || `slot-${i + 1}`;
+  const staffName = (i) => {
+    const id = staffId(i);
+    const found = workerPool().find((w) => w.id === id);
+    return found ? found.name : `Worker ${i + 1}`;
+  };
+  // Per-worker "had extra" booleans for the workers currently on shift.
+  const extras = () => {
+    const byId = new Map(workerPool().map((w) => [w.id, !!w.extra]));
+    const ids = assignedIds();
+    return Array.from({ length: workers() }, (_, i) => !!byId.get(ids[i]));
+  };
   let lastGroups = [];
   // Bed ids look like "12A"; the label is the part after the room name.
   const emptyMap = () => (shared.on ? shared.empty : state.empty);
@@ -515,39 +698,34 @@ textarea, input[type=text], input[type=number] {
     n = Math.max(1, Math.min(50, Math.floor(Number(n) || 1)));
     if (n !== workers()) {
       local().workers = n;
-      if (sharedShift()) { sharedShift().workers = n; queue({ op: 'setWorkers', shift: tab(), workers: n }); }
+      syncShiftIds(local(), tab());
+      if (sharedShift()) {
+        sharedShift().workers = n;
+        queue({ op: 'setWorkers', shift: tab(), workers: n });
+      }
     }
+    openMenuSlot = -1;
+    update();
+  }
+
+  function assignWorker(slotIdx, chosenId) {
+    const ids = assignedIds();
+    const n = workers();
+    const otherIdx = ids.slice(0, n).indexOf(chosenId);
+    if (otherIdx >= 0 && otherIdx !== slotIdx) {
+      ids[otherIdx] = ids[slotIdx];
+    }
+    ids[slotIdx] = chosenId;
+    openMenuSlot = -1;
     update();
   }
 
   function setTab(name) {
     if (!SHIFTS.includes(name)) return;
     state.tab = name;
-    namesBox.innerHTML = '';
+    openMenuSlot = -1;
     setFinalizeStatus('');
     update();
-  }
-
-  function renderNames() {
-    const n = workers();
-    if (namesBox.dataset.shift === tab() && namesBox.querySelectorAll('input').length === n) return;
-    namesBox.dataset.shift = tab();
-    const names = local().names;
-    namesBox.innerHTML = '';
-    for (let i = 0; i < n; i++) {
-      const label = document.createElement('label');
-      const sw = document.createElement('span');
-      sw.className = 'swatch';
-      sw.style.background = color(i);
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.placeholder = `Worker ${i + 1}`;
-      input.value = names[i] || '';
-      input.setAttribute('aria-label', `Name for worker ${i + 1}`);
-      input.addEventListener('input', () => { names[i] = input.value; update(); });
-      label.append(sw, input);
-      namesBox.append(label);
-    }
   }
 
   function el(tag, cls, text) {
@@ -622,7 +800,6 @@ textarea, input[type=text], input[type=number] {
     $('shift-panel').setAttribute('aria-labelledby', `tab-${tab()}`);
     $('print-shift').textContent = `${tab()} assignments, ${new Date().toLocaleDateString()}`;
     if (document.activeElement !== countInput) countInput.value = workers();
-    renderNames();
 
     // Assignment list: one line per worker with their bed range.
     const bedOrder = allBeds.map((x) => x.id);
@@ -633,17 +810,68 @@ textarea, input[type=text], input[type=number] {
       return { count: occ.length, range: first === last ? first : `${first} – ${last}` };
     });
     results.innerHTML = '';
+    const pool = workerPool();
+    const currentIds = assignedIds().slice(0, workers());
+    const activeFlags = extras().slice(0, workers());
+    const shiftOrder = [tab(), ...SHIFTS.filter((s) => s !== tab()), 'On Call'];
+
     groups.forEach((g, i) => {
       const li = el('li');
       li.style.borderLeftColor = color(i);
       const who = el('div', 'who');
-      const name = el('span', null, staffName(i));
-      if (extras()[i] && !extras().slice(0, workers()).every(Boolean)) {
+      const wrap = el('div', 'worker-wrap');
+      const pick = el('button', 'worker-pick');
+      pick.type = 'button';
+      const isOpen = openMenuSlot === i;
+      pick.setAttribute('aria-haspopup', 'listbox');
+      pick.setAttribute('aria-expanded', String(isOpen));
+      const sw = el('span', 'swatch');
+      sw.style.background = color(i);
+      pick.append(sw, el('span', 'worker-label', staffName(i)), el('span', 'caret', '▾'));
+      pick.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openMenuSlot = openMenuSlot === i ? -1 : i;
+        update();
+      });
+      wrap.append(pick);
+
+      if (activeFlags[i]) {
         const tag = el('span', 'tag', 'had extra');
         tag.title = 'Got an extra patient earlier this round, so the next extras go to others first.';
-        name.append(' ', tag);
+        wrap.append(tag);
       }
-      who.append(name,
+
+      if (isOpen) {
+        const menu = el('div', 'worker-menu');
+        menu.setAttribute('role', 'listbox');
+        menu.setAttribute('aria-label', `Choose worker for slot ${i + 1}`);
+        menu.addEventListener('click', (e) => e.stopPropagation());
+        for (const shName of shiftOrder) {
+          const groupWorkers = pool
+            .filter((w) => w.shift === shName)
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name));
+          if (!groupWorkers.length) continue;
+          menu.append(el('div', 'worker-group-label', shName));
+          for (const w of groupWorkers) {
+            const opt = el('button', 'worker-opt');
+            opt.type = 'button';
+            opt.setAttribute('role', 'option');
+            const selected = w.id === staffId(i);
+            opt.setAttribute('aria-selected', String(selected));
+            opt.append(el('span', null, w.name));
+            const assignedAt = currentIds.indexOf(w.id);
+            if (assignedAt >= 0 && assignedAt !== i) {
+              opt.append(el('span', 'slot-note', `#${assignedAt + 1}`));
+            }
+            opt.addEventListener('click', () => assignWorker(i, w.id));
+            menu.append(opt);
+          }
+        }
+        wrap.append(menu);
+      }
+
+      who.append(wrap,
                  el('span', 'count', `${g.occupied.length} patient${g.occupied.length === 1 ? '' : 's'}`));
       li.append(who);
       const occ = g.occupied;
@@ -694,11 +922,16 @@ textarea, input[type=text], input[type=number] {
     const counts = lastGroups.map((g) => g.count);
     const ranges = lastGroups.map((g) => g.range);
     const shift = tab();
-    if (!confirm(`Finalize ${shift}? This records ${counts.join(' / ')} patients for ${counts.length} worker${counts.length === 1 ? '' : 's'}.`)) return;
+    const ids = Array.from({ length: counts.length }, (_, i) => staffId(i));
+    const names = Array.from({ length: counts.length }, (_, i) => staffName(i));
+    if (!confirm(`Finalize ${shift}? This records ${counts.join(' / ')} patients for ${names.join(', ')}.`)) return;
     const entry = { at: new Date().toISOString(), counts, ranges };
     const t = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    state.workers = nextWorkerExtras(workerPool(), shift, ids, counts);
+    state.shifts[shift].extras = nextFlags(state.shifts[shift].extras, counts);
     if (sharedShift()) {
-      queue({ op: 'finalize', shift, counts, ranges });
+      shared.workers = state.workers.map((w) => ({ ...w }));
+      queue({ op: 'finalize', shift, counts, ranges, workerIds: ids });
       clearTimeout(flushTimer);
       const ok = await flush();
       setFinalizeStatus(ok ? `${shift} finalized at ${t}.` : `${shift} was not finalized. Check the message above and try again.`, !ok);
@@ -707,14 +940,12 @@ textarea, input[type=text], input[type=number] {
     const h = state.shifts[shift].history;
     h.unshift(entry);
     h.length = Math.min(h.length, HISTORY_LENGTH);
-    state.shifts[shift].extras = nextFlags(state.shifts[shift].extras, counts);
     setFinalizeStatus(`${shift} finalized at ${t} (saved on this device).`);
     update();
   }
 
-  // Load the room layout from rooms.json next to this page. If that fails
-  // (no file, a typo in it, or the page was opened from disk), fall back to
-  // the built-in layout and say so.
+  // Load the room layout from rooms.json and workers from workers.json next to
+  // this page. If either fails, fall back to the built-in copy and say so.
   function showNote(text, isError) {
     const note = $('layout-note');
     note.hidden = !text;
@@ -723,19 +954,34 @@ textarea, input[type=text], input[type=number] {
   }
   async function loadLayout() {
     if (location.protocol === 'file:') {
-      showNote('Opened from a file, so the built-in room list is being used. On the website, rooms come from rooms.json.');
+      showNote('Opened from a file, so the built-in room and worker lists are being used. On the website, they come from rooms.json and workers.json.');
       return;
     }
+    const notes = [];
+    let isErr = false;
     try {
       const res = await fetch('rooms.json', { cache: 'no-cache' });
       if (!res.ok) throw new Error(`rooms.json could not be loaded (error ${res.status}).`);
       let data;
       try { data = await res.json(); } catch (e) { throw new Error('rooms.json has a formatting mistake (check for a missing comma or quote).'); }
       layout = parseLayout(data);
-      showNote('');
     } catch (e) {
-      showNote(`${e.message} Showing the built-in room list instead.`, true);
+      notes.push(`${e.message} Showing the built-in room list instead.`);
+      isErr = true;
     }
+    try {
+      const res = await fetch('workers.json', { cache: 'no-cache' });
+      if (!res.ok) throw new Error(`workers.json could not be loaded (error ${res.status}).`);
+      let data;
+      try { data = await res.json(); } catch (e) { throw new Error('workers.json has a formatting mistake (check for a missing comma or quote).'); }
+      allWorkers = parseWorkers(data);
+      state.workers = mergeWorkers(allWorkers, state.workers);
+      for (const n of SHIFTS) syncShiftIds(state.shifts[n], n);
+    } catch (e) {
+      notes.push(`${e.message} Showing the built-in worker list instead.`);
+      isErr = true;
+    }
+    showNote(notes.join(' '), isErr);
     if (WORKER_URL) await loadShared();
     update();
   }
@@ -750,23 +996,39 @@ textarea, input[type=text], input[type=number] {
     s.classList.toggle('error', !!isError);
   }
 
-  // Use the Worker's saved state: its rooms, bed counts and occupied beds.
+  // Use the Worker's saved state: its rooms, bed counts, workers and occupied beds.
   function applyShared(saved) {
     layout = parseLayout({ rooms: saved.rooms.map((r) => ({ room: r.room, beds: r.beds.map((b) => b.label) })) });
     const empty = {};
     saved.rooms.forEach((r) => r.beds.forEach((b) => { if (!b.occupied) empty[r.room + b.label] = true; }));
     shared.empty = empty;
     shared.version = saved.version || 0;
+    if (Array.isArray(saved.workers) && saved.workers.length) {
+      shared.workers = mergeWorkers(allWorkers, saved.workers);
+      state.workers = shared.workers.map((w) => ({ ...w }));
+    } else {
+      shared.workers = state.workers.map((w) => ({ ...w }));
+    }
+    for (const n of SHIFTS) syncShiftIds(state.shifts[n], n);
     // A Worker without shift support yet: keep counts and history on this device.
-    shared.shifts = saved.shifts && SHIFTS.every((n) => saved.shifts[n]) ? saved.shifts : null;
+    if (saved.shifts && SHIFTS.every((n) => saved.shifts[n])) {
+      shared.shifts = saved.shifts;
+    } else {
+      shared.shifts = null;
+    }
   }
 
-  // The current layout and bed states, in the Worker's format. Sent with
-  // every save so the very first save can start from rooms.json.
+  // The current layout, workers and bed states, in the Worker's format. Sent with
+  // every save so the very first save can start from rooms.json and workers.json.
   function currentState() {
     return {
       rooms: buildRooms().map((r) => ({ room: r.name, beds: r.beds.map((b) => ({ label: b.label, occupied: b.occupied })) })),
-      shifts: Object.fromEntries(SHIFTS.map((n) => [n, { workers: state.shifts[n].workers, history: state.shifts[n].history, extras: state.shifts[n].extras }])),
+      workers: workerPool().map((w) => ({ id: w.id, name: w.name, shift: w.shift, extra: !!w.extra })),
+      shifts: Object.fromEntries(SHIFTS.map((n) => [n, {
+        workers: state.shifts[n].workers,
+        history: state.shifts[n].history,
+        extras: state.shifts[n].extras,
+      }])),
     };
   }
 
@@ -774,8 +1036,9 @@ textarea, input[type=text], input[type=number] {
     try {
       const res = await fetch(api('/state'), { cache: 'no-store' });
       if (res.status === 404) {
-        // Nothing saved yet: start from rooms.json; the first change saves it.
+        // Nothing saved yet: start from rooms.json and workers.json; the first change saves it.
         shared.on = true;
+        shared.workers = state.workers.map((w) => ({ ...w }));
         if (!shared.shifts) shared.shifts = JSON.parse(JSON.stringify(currentState().shifts));
         if (!quiet) setSync('Shared: changes save for everyone.');
       } else if (!res.ok) {
@@ -920,6 +1183,12 @@ textarea, input[type=text], input[type=number] {
     update();
   });
 
+  document.addEventListener('click', () => {
+    if (openMenuSlot !== -1) { openMenuSlot = -1; update(); }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && openMenuSlot !== -1) { openMenuSlot = -1; update(); }
+  });
 
   countInput.addEventListener('change', () => setStaffCount(countInput.value));
   $('staff-minus').addEventListener('click', () => setStaffCount(workers() - 1));
@@ -938,13 +1207,22 @@ textarea, input[type=text], input[type=number] {
     });
   });
   $('reset').addEventListener('click', () => {
-    if (!confirm('Mark every bed occupied again and clear the worker names on this device?')) return;
+    if (!confirm('Mark every bed occupied again and reset the worker selections to default?')) return;
     const keep = state.shifts;
+    const keepWorkers = state.workers;
     state = defaults();
-    // Worker counts and finalized history are kept; only names are cleared.
-    for (const n of SHIFTS) Object.assign(state.shifts[n], { workers: keep[n].workers, history: keep[n].history, extras: keep[n].extras });
+    state.workers = keepWorkers;
+    // Worker counts, finalized history and worker extra status are kept.
+    for (const n of SHIFTS) {
+      Object.assign(state.shifts[n], {
+        workers: keep[n].workers,
+        history: keep[n].history,
+        extras: keep[n].extras,
+      });
+      syncShiftIds(state.shifts[n], n);
+    }
     if (shared.on) { shared.empty = {}; queue({ op: 'setAll', occupied: true }); }
-    namesBox.innerHTML = '';
+    openMenuSlot = -1;
     update();
   });
 

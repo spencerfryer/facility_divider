@@ -108,3 +108,22 @@ test('finalize flags who got an extra patient, per shift', () => {
   s = applyOps(s, [{ op: 'finalize', shift: 'AM', counts: [3, 4, 4] }]);
   assert.deepStrictEqual(s.shifts.AM.extras, [false, false, false]); // everyone had one: new round
 });
+
+test('finalize updates per-worker extra flags in KV across shifts', () => {
+  const initial = {
+    ...seed(),
+    workers: [
+      { id: 'am1', name: 'Alex', shift: 'AM', extra: false },
+      { id: 'am2', name: 'Bri', shift: 'AM', extra: false },
+      { id: 'pm1', name: 'Jordan', shift: 'PM', extra: false },
+    ],
+  };
+  const s = applyOps(initial, [
+    { op: 'finalize', shift: 'AM', counts: [4, 3, 3], workerIds: ['pm1', 'am1', 'am2'] },
+  ]);
+  assert.deepStrictEqual(s.workers.map((w) => ({ id: w.id, extra: w.extra })), [
+    { id: 'am1', extra: false },
+    { id: 'am2', extra: false },
+    { id: 'pm1', extra: true },
+  ]);
+});

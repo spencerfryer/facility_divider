@@ -10,6 +10,10 @@
  *                                { "label": "B", "occupied": false } ] },
  *       ...
  *     ],
+ *     "workers": [
+ *       { "id": "am1", "name": "Alex", "shift": "AM", "extra": true },
+ *       ...
+ *     ],
  *     "shifts": {
  *       "AM":  { "workers": 4, "extras": [true, false, false, false], "history": [
  *                  { "at": "2026-11-04T07:05:00Z", "counts": [13, 13, 12], "ranges": ["1A – 9A", ...] } ] },
@@ -17,11 +21,6 @@
  *       "NOC": { "workers": 2, "extras": [], "history": [] }
  *     }
  *   }
- * So it holds the rooms, how many beds each room has, whether each bed is
- * occupied, and for each shift the number of workers, the last
- * HISTORY_LENGTH finalized assignments (newest first), and "extras": which
- * worker positions already got an extra patient this round, so the page can
- * rotate the extras fairly.
  *
  * Routes:
  *   GET  /state   anyone: returns the saved state (404 if nothing saved yet)
@@ -35,6 +34,7 @@
 
 export const MAX_BEDS = 3;
 export const SHIFTS = ['AM', 'PM', 'NOC'];
+export const WORKER_GROUPS = ['AM', 'PM', 'NOC', 'On Call'];
 export const HISTORY_LENGTH = 7;
 const MAX_WORKERS = 50;
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -91,7 +91,58 @@ export function nextFlags(flags, counts) {
   return after;
 }
 
+/**
+ * Updates per-worker `extra` status across the facility worker pool after a finalize.
+ * Workers can fill in from any shift and retain or lose their `extra` status.
+ */
+export function nextWorkerExtras(workers, shift, assignedIds, counts) {
+  if (!Array.isArray(workers) || !workers.length) return [];
+  const out = workers.map((w) => ({ id: String(w.id), name: String(w.name), shift: w.shift, extra: !!w.extra }));
+  const byId = new Map(out.map((w) => [w.id, w]));
+  const ids = Array.isArray(assignedIds) ? assignedIds.slice(0, counts.length) : [];
+  const active = ids.map((id) => byId.get(id)).filter(Boolean);
+  if (active.length && active.every((w) => w.extra)) {
+    active.forEach((w) => { w.extra = false; });
+  }
+  const hadBefore = new Set(out.filter((w) => w.extra).map((w) => w.id));
+  const min = Math.min(...counts);
+  const gotSecond = new Set();
+  counts.forEach((c, i) => {
+    if (c > min) {
+      const w = byId.get(ids[i]);
+      if (w) {
+        if (hadBefore.has(w.id)) gotSecond.add(w.id);
+        w.extra = true;
+      }
+    }
+  });
+  const shiftPool = out.filter((w) => w.shift === shift);
+  if (shiftPool.length && shiftPool.every((w) => w.extra)) {
+    shiftPool.forEach((w) => { w.extra = gotSecond.has(w.id); });
+  }
+  if (active.length && active.every((w) => w.extra)) {
+    active.forEach((w) => { w.extra = gotSecond.has(w.id); });
+  }
+  return out;
+}
+
 const clampWorkers = (n) => Math.max(1, Math.min(MAX_WORKERS, Math.floor(Number(n)) || 1));
+
+function cleanWorkers(list) {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const w of list.slice(0, 300)) {
+    if (!w || typeof w !== 'object') continue;
+    const id = String(w.id || '').trim().slice(0, 40);
+    const name = String(w.name || '').trim().slice(0, 40);
+    const shift = WORKER_GROUPS.includes(w.shift) ? w.shift : 'AM';
+    if (!id || !name || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, name, shift, extra: !!w.extra });
+  }
+  return out;
+}
 
 /** Keep only the fields we store, filling in shift defaults for older saves. */
 export function cleanState(s) {
@@ -112,6 +163,7 @@ export function cleanState(s) {
     version: Number.isInteger(s.version) ? s.version : 0,
     updatedAt: s.updatedAt || null,
     rooms: s.rooms.map((r) => ({ room: r.room, beds: r.beds.map((b) => ({ label: b.label, occupied: b.occupied })) })),
+    workers: cleanWorkers(s.workers),
     shifts,
   };
 }
@@ -123,9 +175,7 @@ export function cleanState(s) {
  *   { op: "removeBed", room: "12" }    removes the room's last bed, keeps at least one
  *   { op: "setAll", occupied: true }   marks every bed occupied (or empty)
  *   { op: "setWorkers", shift: "AM", workers: 4 }
- *   { op: "finalize", shift: "AM", counts: [13, 13, 12], ranges: ["1A – 9A", ...] }
- *        records the patients per worker; keeps the newest HISTORY_LENGTH,
- *        and flags the workers who got an extra patient (see nextFlags)
+ *   { op: "finalize", shift: "AM", counts: [13, 13, 12], ranges: ["1A – 9A", ...], workerIds: ["am1", ...] }
  */
 export function applyOps(state, ops) {
   if (!Array.isArray(ops) || ops.length > 200) throw new Error('"ops" must be a list of up to 200 changes');
@@ -176,6 +226,9 @@ export function applyOps(state, ops) {
         h.unshift({ at: new Date().toISOString(), counts: o.counts, ranges });
         h.length = Math.min(h.length, HISTORY_LENGTH);
         s.shifts[o.shift].extras = nextFlags(s.shifts[o.shift].extras, o.counts);
+        if (s.workers.length && Array.isArray(o.workerIds)) {
+          s.workers = nextWorkerExtras(s.workers, o.shift, o.workerIds, o.counts);
+        }
         break;
       }
       default:
@@ -214,11 +267,17 @@ export default {
       let body;
       try { body = await request.json(); } catch (e) { return json({ error: 'body must be JSON' }, 400); }
       try {
-        // First save ever: start from the layout the page sent (from rooms.json).
+        // First save ever: start from the layout and workers the page sent.
         let current = await env.BEDS.get(KEY, 'json');
         if (!current) {
           if (!body.seed) return json({ error: 'nothing saved yet and no starting layout sent' }, 409);
           current = cleanState(validateState(body.seed));
+        } else if (body.seed && Array.isArray(body.seed.workers) && body.seed.workers.length) {
+          const savedExtra = new Map((current.workers || []).map((w) => [w.id, !!w.extra]));
+          current.workers = cleanWorkers(body.seed.workers).map((w) => ({
+            ...w,
+            extra: savedExtra.has(w.id) ? savedExtra.get(w.id) : !!w.extra,
+          }));
         }
         const next = validateState(applyOps(current, body.ops));
         next.version = (current.version || 0) + 1;

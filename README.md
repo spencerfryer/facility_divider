@@ -5,12 +5,12 @@ A small web page that splits the occupied beds in a unit evenly among the staff 
 ## How it works
 
 1. **Rooms and beds.** The rooms come from [`rooms.json`](rooms.json) (see below). The page shows every room in one column with a block for each bed. Every bed starts out occupied (orange); tap the empty ones to clear them.
-2. **Assignments.** Pick the **AM**, **PM** or **NOC** tab and set how many people are working that shift (each tab remembers its own number). Names are optional. Only the occupied beds are divided, in order, regardless of room:
-   - Each worker gets a **continuous run of occupied beds**, and patient counts differ by **at most one** (the first workers get the extra patient).
+2. **Assignments.** Pick the **AM**, **PM** or **NOC** tab and set how many people are working that shift (each tab remembers its own number). Tap any worker's name to pick from that shift's roster in [`workers.json`](workers.json). Only the occupied beds are divided, in order, regardless of room:
+   - Each worker gets a **continuous run of occupied beds**, and patient counts differ by **at most one** (the first eligible workers get the extra patient).
    - A room can be shared: if one worker's range ends on 29B, the next starts on 29C.
    - Each worker's line shows their range (for example *Beds 1A – 9A*) and any empty beds inside it to skip.
    - **Print** prints that tab's list. **Finalize** records how many patients each worker got; each tab keeps its last 7 finalized records, newest first.
-   - **Fair extras:** when the beds don't divide evenly, some workers get one extra patient. Finalize marks those workers ("had extra"), and the next extras go to the others first, until everyone in that tab has had one and the round starts over. Workers are counted by position (Worker 1, 2, 3…); if the number of workers changes, new positions start unmarked.
+   - **Fair extras:** when the beds don't divide evenly, some workers get one extra patient. Finalize records those workers' unique `id`s (`hadExtra` in KV), and the next extras go to the other workers first, following the person across shifts until everyone has had one and the round starts over.
 
 Everything is saved in the browser's local storage on that device only. Nothing is sent anywhere.
 
@@ -52,5 +52,6 @@ node --test tests/*.test.js tests/*.test.mjs
 
 - `index.html` – the whole app
 - `rooms.json` – the room and bed list
+- `workers.json` – the AM, PM, NOC, and On Call worker lists (`{ "id": "am-cecile", "name": "Cecile" }`)
 - `worker/` – the optional Cloudflare Worker for a shared bed list
 - `tests/divide.test.js` – tests for the splitting logic, read straight out of `index.html`
