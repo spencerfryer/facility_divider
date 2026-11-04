@@ -172,8 +172,8 @@ textarea, input[type=text], input[type=number] {
 .assign-list li { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
 .assign-list .who { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 650; }
 .assign-list .count { color: var(--muted); font-weight: 500; white-space: nowrap; }
-.assign-list .range { font-size: 1.3rem; font-weight: 700; margin: 2px 0 0; }
-.assign-list .rooms, .assign-list .open { color: var(--muted); font-size: 0.9rem; margin: 2px 0 0; }
+.assign-list .range { font-size: 1.3rem; font-weight: 700; margin: 2px 0 0; padding-left: 31px; }
+.assign-list .rooms, .assign-list .open { color: var(--muted); font-size: 0.9rem; margin: 2px 0 0; padding-left: 31px; }
 .layout-note { font-size: 0.9rem; border-radius: 8px; padding: 8px 10px; margin: 0 0 10px; background: var(--bg); color: var(--muted); }
 .editing .room-name { width: 2.6em; }
 .sync { font-size: 0.85rem; color: var(--muted); margin: 0 0 8px; }
@@ -210,6 +210,7 @@ textarea, input[type=text], input[type=number] {
   body { background: #fff; color: #000; }
   .top .sub, .row, .hint, .worker-menu, .worker-pick .caret, .tabs, #finalize-status, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type { display: none !important; }
   .worker-pick { border: none; background: none; color: #000; padding: 0; min-height: 0; }
+  .assign-list .range, .assign-list .rooms, .assign-list .open { padding-left: 20px; }
   .panel { border: none; padding: 0; margin: 8px 0; }
   .panel > h2 { display: none; }
   .print-only { display: block; margin: 0 0 8px; }
