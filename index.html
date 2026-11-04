@@ -961,7 +961,7 @@ textarea, input[type=text], input[type=number] {
 
   function formatSavedAt(iso) {
     const d = iso ? new Date(iso) : new Date();
-    const stamp = isNaN(d) ? String(iso) : d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+    const stamp = isNaN(d) ? String(iso) : d.toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' });
     return `Saved ${stamp}`;
   }
 
