@@ -144,13 +144,14 @@ textarea, input[type=text], input[type=number] {
 .assign-list .range { font-size: 1.3rem; font-weight: 700; margin: 2px 0 0; }
 .assign-list .rooms, .assign-list .open { color: var(--muted); font-size: 0.9rem; margin: 2px 0 0; }
 .layout-note { font-size: 0.9rem; border-radius: 8px; padding: 8px 10px; margin: 0 0 10px; background: var(--bg); color: var(--muted); }
-.editing .room { gap: 6px; }
-.editing .room-name { width: 2.4em; }
+.editing .room-name { width: 2.6em; }
 .sync { font-size: 0.85rem; color: var(--muted); margin: 0 0 8px; }
 .sync.error { color: var(--error); }
-.bed-tools { display: flex; gap: 4px; flex: none; align-items: center; }
-.bed-tools button { min-width: 34px; width: 34px; min-height: 44px; padding: 0; font-size: 1.3rem; line-height: 1; background: transparent; color: var(--text); border-color: var(--border); }
-.bed-tools button:disabled { opacity: 0.35; cursor: default; }
+.room-line { display: flex; align-items: center; gap: 8px; }
+.room-line .room { flex: 1; min-width: 0; }
+.beds-row .bed.add-bed { border: 2px dashed var(--accent); color: var(--accent); font-size: 1.5rem; font-weight: 500; }
+.remove-bed { flex: none; width: 44px; min-height: 44px; padding: 0; font-size: 1.4rem; line-height: 1; background: transparent; color: var(--text); border-color: var(--border); }
+.remove-bed:disabled { opacity: 0.35; cursor: default; }
 #edit-toggle[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .layout-note.error { color: var(--error); border: 1px solid var(--error); }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 0.9rem; color: var(--muted); margin: 8px 0; }
@@ -159,7 +160,7 @@ textarea, input[type=text], input[type=number] {
 
 @media print {
   body { background: #fff; color: #000; }
-  .top .sub, .row, .hint, .names, #print, .foot, .layout-note, .sync, #edit-toggle, .bed-tools, .check, section:first-of-type { display: none !important; }
+  .top .sub, .row, .hint, .names, #print, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type { display: none !important; }
   .panel { border: none; padding: 0; margin: 8px 0; }
   .bed, .card, .assign-list li { -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; }
 }
@@ -179,7 +180,7 @@ textarea, input[type=text], input[type=number] {
       </div>
       <p class="layout-note" id="layout-note" hidden></p>
       <p class="sync" id="sync-status" hidden></p>
-      <p class="hint" id="edit-hint" hidden>Use <strong>+</strong> and <strong>−</strong> at the end of a room to add or remove a bed (up to 4 per room). Changes save for everyone.</p>
+      <p class="hint" id="edit-hint" hidden>Tap <strong>+</strong> in a room to add a bed (up to 4), or <strong>−</strong> beside a room to remove its last bed. Changes save for everyone.</p>
       <p class="hint">Every bed starts as occupied. Tap the empty ones to clear them.</p>
       <p class="legend"><span class="key occ"></span> Occupied <span class="key"></span> Empty <span class="census" id="census"></span></p>
       <div class="row tight">
@@ -454,7 +455,8 @@ textarea, input[type=text], input[type=number] {
     // Room grid
     grid.innerHTML = '';
     grid.classList.toggle('editing', editing);
-    grid.style.setProperty('--max-beds', Math.max(1, ...rooms.map((r) => r.beds.length)));
+    // In edit mode leave room for the "+" slot, so size beds for the 4-bed maximum.
+    grid.style.setProperty('--max-beds', editing ? MAX_BEDS : Math.max(1, ...rooms.map((r) => r.beds.length)));
     for (const room of rooms) {
       const box = el('div', 'room');
 
@@ -476,22 +478,23 @@ textarea, input[type=text], input[type=number] {
         bedsRow.append(btn);
       }
       box.append(bedsRow);
-      if (editing) {
-        const tools = el('div', 'bed-tools');
-        const plus = el('button', null, '+');
+      if (!editing) { grid.append(box); continue; }
+      // Edit mode: "+" sits in the next empty bed slot; "−" sits outside the room.
+      if (room.beds.length < MAX_BEDS) {
+        const plus = el('button', 'bed add-bed', '+');
         plus.type = 'button';
-        plus.disabled = room.beds.length >= MAX_BEDS;
         plus.setAttribute('aria-label', `Add a bed to room ${room.name}`);
         plus.addEventListener('click', () => changeBeds(room.name, +1));
-        const minus = el('button', null, '−');
-        minus.type = 'button';
-        minus.disabled = room.beds.length <= 1;
-        minus.setAttribute('aria-label', `Remove a bed from room ${room.name}`);
-        minus.addEventListener('click', () => changeBeds(room.name, -1));
-        tools.append(plus, minus);
-        box.append(tools);
+        bedsRow.append(plus);
       }
-      grid.append(box);
+      const line = el('div', 'room-line');
+      const minus = el('button', 'remove-bed', '−');
+      minus.type = 'button';
+      minus.disabled = room.beds.length <= 1;
+      minus.setAttribute('aria-label', `Remove the last bed from room ${room.name}`);
+      minus.addEventListener('click', () => changeBeds(room.name, -1));
+      line.append(box, minus);
+      grid.append(line);
     }
 
     const occCount = allBeds.filter((b) => b.occupied).length;
