@@ -1,6 +1,18 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { evenSizes, divideBeds, parseBedList } = require('../js/divide.js');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+// The app is a single index.html; pull the splitting logic out of its <script id="divide-logic"> block.
+const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const code = html.match(/<script id="divide-logic">([\s\S]*?)<\/script>/)[1];
+const sandbox = { self: {} };
+vm.runInNewContext(code, sandbox);
+// Round-trip through JSON so arrays from the sandbox compare equal to local ones.
+const wrap = (fn) => (...args) => JSON.parse(JSON.stringify(fn(...args)));
+const { evenSizes, divideBeds, parseBedList } = Object.fromEntries(
+  Object.entries(sandbox.self.Divider).map(([k, fn]) => [k, wrap(fn)]));
 
 const beds = (spec) => spec.split('').map((c, i) => ({ id: String(i + 1), occupied: c === 'x' }));
 

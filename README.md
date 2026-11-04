@@ -1,6 +1,6 @@
 # Bed Divider
 
-A small web page that splits the occupied beds in a unit evenly among the staff on shift. It is a plain static site (HTML, CSS, JavaScript, no build step, no server), so it runs on GitHub Pages and works on phones.
+A small web page that splits the occupied beds in a unit evenly among the staff on shift. It is one self-contained HTML file (styles and scripts inline, no build step, no server), so it runs on GitHub Pages and works on phones.
 
 ## How it works
 
@@ -30,8 +30,5 @@ node --test tests/*.test.js
 
 ## Files
 
-- `index.html` – the page
-- `css/style.css` – styles (light and dark mode, print layout)
-- `js/divide.js` – the splitting logic (pure functions, tested)
-- `js/app.js` – page behaviour
-- `tests/divide.test.js` – tests for the splitting logic
+- `index.html` – the whole app. You can also just email or copy this one file and open it anywhere.
+- `tests/divide.test.js` – tests for the splitting logic, read straight out of `index.html`

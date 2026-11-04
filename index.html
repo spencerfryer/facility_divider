@@ -5,7 +5,129 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Bed Divider</title>
   <meta name="description" content="Split the occupied beds in a unit evenly among the staff on shift.">
-  <link rel="stylesheet" href="css/style.css">
+  <style>
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --text: #1b1f24;
+  --muted: #5d6673;
+  --border: #d9dde3;
+  --accent: #1f6feb;
+  --accent-text: #ffffff;
+  --empty-bg: #ffffff;
+  --empty-text: #8a929d;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111418;
+    --surface: #1a1f25;
+    --text: #e6e9ed;
+    --muted: #9aa3ae;
+    --border: #2f3640;
+    --accent: #4c8dff;
+    --empty-bg: #1a1f25;
+    --empty-text: #6f7884;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.top, main, .foot { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+.top { padding-top: 24px; }
+h1 { font-size: 1.6rem; margin: 0 0 4px; }
+h2 { font-size: 1.1rem; margin: 0; }
+.sub, .hint { color: var(--muted); margin: 0 0 8px; }
+.hint { font-size: 0.9rem; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin: 16px 0;
+}
+.panel > h2 { margin-bottom: 12px; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0; }
+.row.tight { margin-top: 0; }
+
+button {
+  font: inherit;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  min-height: 40px;
+}
+button.ghost { background: transparent; color: var(--text); border-color: var(--border); }
+button.link { background: none; border: none; color: var(--accent); padding: 0; min-height: 0; text-decoration: underline; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+textarea, input[type=text], input[type=number] {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  width: 100%;
+}
+.bed-editor label { display: block; font-size: 0.9rem; color: var(--muted); margin-bottom: 6px; }
+.bed-editor { margin-bottom: 12px; }
+
+.bed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; }
+.bed {
+  min-height: 56px;
+  padding: 6px 4px;
+  border-radius: 8px;
+  border: 2px dashed var(--border);
+  background: var(--empty-bg);
+  color: var(--empty-text);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  line-height: 1.15;
+}
+.bed .name { font-weight: 650; font-size: 1rem; word-break: break-word; }
+.bed .who { font-size: 0.72rem; opacity: 0.9; }
+.bed.occupied { border-style: solid; color: #fff; }
+.bed.empty.owned { border-color: currentColor; }
+
+.inline { font-weight: 600; }
+.stepper { display: inline-flex; align-items: stretch; }
+.stepper input { width: 4.5em; text-align: center; border-radius: 0; border-left: none; border-right: none; }
+.stepper button:first-child { border-radius: 8px 0 0 8px; }
+.stepper button:last-child { border-radius: 0 8px 8px 0; }
+.stepper button { min-width: 44px; padding: 0; font-size: 1.2rem; }
+
+.names summary { cursor: pointer; color: var(--accent); margin-top: 4px; }
+.staff-names { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-top: 10px; }
+.staff-names label { display: flex; align-items: center; gap: 8px; }
+.swatch { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+
+.results { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.card { border: 1px solid var(--border); border-left: 6px solid; border-radius: 8px; padding: 10px 12px; }
+.card h3 { margin: 0 0 4px; font-size: 1rem; display: flex; justify-content: space-between; gap: 8px; }
+.card .count { color: var(--muted); font-weight: 500; white-space: nowrap; }
+.card .beds { font-size: 1.05rem; font-weight: 600; margin: 2px 0; }
+.card .open { color: var(--muted); font-size: 0.9rem; margin: 2px 0 0; }
+.notice { color: var(--muted); }
+
+.foot { color: var(--muted); font-size: 0.85rem; padding-bottom: 32px; }
+
+@media print {
+  body { background: #fff; color: #000; }
+  .top .sub, .row, .hint, .names, #print, .foot, #edit-beds-toggle, .bed-editor { display: none !important; }
+  .panel { border: none; padding: 0; margin: 8px 0; }
+  .bed, .card { -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; }
+}
+  </style>
 </head>
 <body>
   <header class="top">
@@ -64,7 +186,279 @@
     <p>Runs entirely in your browser. Nothing is sent anywhere; your bed list and names are saved on this device only. <button type="button" class="link" id="reset">Reset everything</button></p>
   </footer>
 
-  <script src="js/divide.js"></script>
-  <script src="js/app.js"></script>
+  <script id="divide-logic">
+/**
+ * Core splitting logic. Pure functions, no DOM, so it can be tested in Node.
+ *
+ * Beds are kept in the order they are listed (that order stands in for the
+ * physical layout, e.g. down the hall). Occupied beds are split into one
+ * contiguous run per staff member, with group sizes differing by at most one.
+ * Empty beds are attached to whichever group's span they fall inside, so each
+ * person also knows which open beds (admissions) are "theirs".
+ */
+(function (root) {
+  /**
+   * Sizes of `groups` groups covering `total` items as evenly as possible.
+   * Larger groups come first, e.g. evenSizes(10, 3) -> [4, 3, 3].
+   */
+  function evenSizes(total, groups) {
+    if (groups <= 0) return [];
+    const base = Math.floor(total / groups);
+    const extra = total % groups;
+    const sizes = [];
+    for (let i = 0; i < groups; i++) sizes.push(base + (i < extra ? 1 : 0));
+    return sizes;
+  }
+
+  /**
+   * @param {{id: string, occupied: boolean}[]} beds  beds in layout order
+   * @param {number} staffCount
+   * @returns {{groups: {occupied: string[], empty: string[]}[], unassignedEmpty: string[]}}
+   */
+  function divideBeds(beds, staffCount) {
+    const n = Math.max(0, Math.floor(Number(staffCount) || 0));
+    const groups = [];
+    for (let i = 0; i < n; i++) groups.push({ occupied: [], empty: [] });
+    if (n === 0) {
+      return { groups, unassignedEmpty: beds.filter((b) => !b.occupied).map((b) => b.id) };
+    }
+
+    const occupiedIdx = [];
+    beds.forEach((b, i) => { if (b.occupied) occupiedIdx.push(i); });
+    const sizes = evenSizes(occupiedIdx.length, n);
+
+    // owner[i] = group index owning bed i (occupied beds only for now)
+    const owner = new Array(beds.length).fill(-1);
+    let k = 0;
+    sizes.forEach((size, g) => {
+      for (let j = 0; j < size; j++) owner[occupiedIdx[k++]] = g;
+    });
+
+    // Empty beds: belong to the group of the nearest occupied bed before them
+    // in the list; leading empties go to the first group that has any beds.
+    const firstGroupWithBeds = sizes.findIndex((s) => s > 0);
+    let current = firstGroupWithBeds >= 0 ? firstGroupWithBeds : 0;
+    beds.forEach((b, i) => {
+      if (b.occupied) {
+        current = owner[i];
+        groups[current].occupied.push(b.id);
+      } else {
+        groups[current].empty.push(b.id);
+      }
+    });
+
+    // If nobody has occupied beds (census of zero), spread empties evenly instead.
+    if (occupiedIdx.length === 0) {
+      groups.forEach((g) => { g.empty = []; });
+      const emptySizes = evenSizes(beds.length, n);
+      let e = 0;
+      emptySizes.forEach((size, g) => {
+        for (let j = 0; j < size; j++) groups[g].empty.push(beds[e++].id);
+      });
+    }
+
+    return { groups, unassignedEmpty: [] };
+  }
+
+  /**
+   * Turn free text into bed ids. Accepts commas or newlines, and ranges like
+   * "1-20" or "A1-A12" (same prefix, numeric suffix).
+   */
+  function parseBedList(text) {
+    const out = [];
+    const parts = String(text).split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+    for (const part of parts) {
+      const m = part.match(/^(.*?)(\d+)\s*-\s*(\1)?(\d+)$/);
+      if (m) {
+        const prefix = m[1];
+        const a = parseInt(m[2], 10);
+        const b = parseInt(m[4], 10);
+        const width = m[2].length === m[4].length && m[2].startsWith('0') ? m[2].length : 0;
+        const step = a <= b ? 1 : -1;
+        if (Math.abs(b - a) > 2000) { out.push(part); continue; }
+        for (let x = a; step > 0 ? x <= b : x >= b; x += step) {
+          out.push(prefix + String(x).padStart(width, '0'));
+        }
+      } else {
+        out.push(part);
+      }
+    }
+    // de-duplicate, keep first occurrence
+    return out.filter((id, i) => out.indexOf(id) === i);
+  }
+
+  const api = { evenSizes, divideBeds, parseBedList };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.Divider = api;
+})(typeof self !== 'undefined' ? self : this);
+  </script>
+  <script>
+(function () {
+  const { divideBeds, parseBedList } = window.Divider;
+  const STORE = 'bed-divider:v1';
+  // Distinct colors that keep white text readable.
+  const COLORS = ['#1f6feb', '#d1453b', '#1a7f37', '#8250df', '#bc4c00', '#0a7d8c', '#bf3989', '#6e7781',
+                  '#9a6700', '#0550ae', '#a40e26', '#116329', '#6639ba', '#953800', '#1b7c83', '#99286e'];
+  const color = (i) => COLORS[i % COLORS.length];
+
+  const defaults = () => ({ bedText: '1-20', beds: parseBedList('1-20'), occupied: {}, staffCount: 3, names: [] });
+
+  let state = load();
+
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORE));
+      if (s && Array.isArray(s.beds)) return Object.assign(defaults(), s);
+    } catch (e) { /* storage unavailable */ }
+    return defaults();
+  }
+  function save() {
+    try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) { /* ignore */ }
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const grid = $('bed-grid');
+  const results = $('results');
+  const countInput = $('staff-count');
+  const namesBox = $('staff-names');
+
+  const staffName = (i) => (state.names[i] || '').trim() || `Staff ${i + 1}`;
+
+  function setStaffCount(n) {
+    n = Math.max(1, Math.min(50, Math.floor(Number(n) || 1)));
+    state.staffCount = n;
+    countInput.value = n;
+    renderNames();
+    update();
+  }
+
+  function renderNames() {
+    const existing = namesBox.querySelectorAll('input').length;
+    if (existing === state.staffCount) return;
+    namesBox.innerHTML = '';
+    for (let i = 0; i < state.staffCount; i++) {
+      const label = document.createElement('label');
+      const sw = document.createElement('span');
+      sw.className = 'swatch';
+      sw.style.background = color(i);
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = `Staff ${i + 1}`;
+      input.value = state.names[i] || '';
+      input.setAttribute('aria-label', `Name for staff ${i + 1}`);
+      input.addEventListener('input', () => { state.names[i] = input.value; update(); });
+      label.append(sw, input);
+      namesBox.append(label);
+    }
+  }
+
+  function update() {
+    const beds = state.beds.map((id) => ({ id, occupied: !!state.occupied[id] }));
+    const { groups } = divideBeds(beds, state.staffCount);
+    const ownerOf = {};
+    groups.forEach((g, i) => [...g.occupied, ...g.empty].forEach((id) => { ownerOf[id] = i; }));
+
+    // Bed grid
+    grid.innerHTML = '';
+    for (const b of beds) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const owner = ownerOf[b.id];
+      btn.className = 'bed ' + (b.occupied ? 'occupied' : 'empty') + (owner != null ? ' owned' : '');
+      btn.setAttribute('aria-pressed', String(b.occupied));
+      btn.setAttribute('aria-label', `Bed ${b.id}, ${b.occupied ? 'occupied' : 'empty'}` + (owner != null ? `, ${staffName(owner)}` : ''));
+      if (b.occupied && owner != null) { btn.style.background = color(owner); btn.style.borderColor = color(owner); }
+      else if (owner != null) { btn.style.color = color(owner); }
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = b.id;
+      const who = document.createElement('span');
+      who.className = 'who';
+      who.textContent = b.occupied ? (owner != null ? staffName(owner) : '') : 'empty';
+      btn.append(name, who);
+      btn.addEventListener('click', () => {
+        if (state.occupied[b.id]) delete state.occupied[b.id]; else state.occupied[b.id] = true;
+        update();
+      });
+      grid.append(btn);
+    }
+
+    const occCount = beds.filter((b) => b.occupied).length;
+    $('census').textContent = `${occCount} of ${beds.length} occupied.`;
+
+    // Result cards
+    results.innerHTML = '';
+    if (occCount === 0) {
+      const p = document.createElement('p');
+      p.className = 'notice';
+      p.textContent = 'No beds are marked occupied yet, so only empty beds are split below.';
+      results.append(p);
+    }
+    groups.forEach((g, i) => {
+      const card = document.createElement('article');
+      card.className = 'card';
+      card.style.borderLeftColor = color(i);
+      const h = document.createElement('h3');
+      const nm = document.createElement('span');
+      nm.textContent = staffName(i);
+      const ct = document.createElement('span');
+      ct.className = 'count';
+      ct.textContent = `${g.occupied.length} patient${g.occupied.length === 1 ? '' : 's'}`;
+      h.append(nm, ct);
+      const bedsP = document.createElement('p');
+      bedsP.className = 'beds';
+      bedsP.textContent = g.occupied.length ? g.occupied.join(', ') : 'No occupied beds';
+      card.append(h, bedsP);
+      if (g.empty.length) {
+        const openP = document.createElement('p');
+        openP.className = 'open';
+        openP.textContent = `Empty beds in this area: ${g.empty.join(', ')}`;
+        card.append(openP);
+      }
+      results.append(card);
+    });
+
+    save();
+  }
+
+  // Bed list editor
+  const editor = $('bed-editor');
+  const toggle = $('edit-beds-toggle');
+  const bedList = $('bed-list');
+  toggle.addEventListener('click', () => {
+    const open = editor.hidden;
+    editor.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.textContent = open ? 'Close bed list' : 'Edit bed list';
+    if (open) { bedList.value = state.bedText; bedList.focus(); }
+  });
+  $('apply-beds').addEventListener('click', () => {
+    const beds = parseBedList(bedList.value);
+    if (!beds.length) { bedList.focus(); return; }
+    state.bedText = bedList.value;
+    state.beds = beds;
+    const keep = {};
+    beds.forEach((id) => { if (state.occupied[id]) keep[id] = true; });
+    state.occupied = keep;
+    update();
+  });
+
+  $('all-occ').addEventListener('click', () => { state.occupied = {}; state.beds.forEach((id) => { state.occupied[id] = true; }); update(); });
+  $('all-empty').addEventListener('click', () => { state.occupied = {}; update(); });
+
+  countInput.addEventListener('change', () => setStaffCount(countInput.value));
+  $('staff-minus').addEventListener('click', () => setStaffCount(state.staffCount - 1));
+  $('staff-plus').addEventListener('click', () => setStaffCount(state.staffCount + 1));
+  $('print').addEventListener('click', () => window.print());
+  $('reset').addEventListener('click', () => {
+    if (!confirm('Clear the bed list, occupied beds, and staff names?')) return;
+    state = defaults();
+    namesBox.innerHTML = '';
+    setStaffCount(state.staffCount);
+  });
+
+  setStaffCount(state.staffCount);
+})();
+  </script>
 </body>
 </html>
