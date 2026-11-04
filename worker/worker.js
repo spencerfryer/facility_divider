@@ -153,12 +153,19 @@ export function cleanState(s) {
       extras: Array.isArray(sh.extras) ? sh.extras.slice(0, MAX_WORKERS).map(Boolean) : [],
     };
   }
+  const finalizations = Array.isArray(s.finalizations)
+    ? s.finalizations
+        .filter((f) => f && SHIFTS.includes(f.shift) && typeof f.at === 'string' && f.at.trim())
+        .slice(0, 3)
+        .map((f) => ({ shift: f.shift, at: f.at.trim().slice(0, 60) }))
+    : [];
   return {
     version: Number.isInteger(s.version) ? s.version : 0,
     updatedAt: s.updatedAt || null,
     rooms: s.rooms.map((r) => ({ room: r.room, beds: r.beds.map((b) => ({ label: b.label, occupied: b.occupied })) })),
     workers: cleanWorkers(s.workers),
     shifts,
+    finalizations,
   };
 }
 
@@ -222,6 +229,8 @@ export function applyOps(state, ops) {
         if (s.workers.length && Array.isArray(o.workerIds)) {
           s.workers = nextWorkerExtras(s.workers, o.shift, o.workerIds, o.counts);
         }
+        const at = typeof o.at === 'string' && o.at.trim() ? o.at.trim().slice(0, 60) : new Date().toISOString();
+        s.finalizations = [{ shift: o.shift, at }, ...(s.finalizations || [])].slice(0, 3);
         break;
       }
       default:

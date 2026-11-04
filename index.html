@@ -251,12 +251,15 @@ textarea, input[type=text], input[type=number] {
 .shift-bar .actions { display: flex; gap: 8px; margin-left: auto; }
 .print-only { display: none; }
 .tag { font-size: 0.75rem; font-weight: 500; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; white-space: nowrap; }
+.finalizations { margin-top: 12px; font-size: 0.85rem; color: var(--muted); }
+.finalizations-title { font-weight: 600; margin-bottom: 2px; }
+.finalizations-list { white-space: pre-line; line-height: 1.45; }
 
 @page { margin: 0.45in; }
 @media print {
   :root { color-scheme: light; }
   html, body { background: #fff !important; color: #000 !important; font-size: 14px; }
-  .top, .row, .hint, .worker-menu, .worker-modal, .worker-pick .caret, .shift-dot, .tabs, #finalize-status, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type { display: none !important; }
+  .top, .row, .hint, .worker-menu, .worker-modal, .worker-pick .caret, .shift-dot, .tabs, #finalize-status, .finalizations, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type { display: none !important; }
   main { max-width: none; padding: 0; margin: 0; }
   .panel { background: #fff !important; color: #000 !important; border: none; padding: 0; margin: 0; }
   .panel > h2 { display: none; }
@@ -381,6 +384,10 @@ textarea, input[type=text], input[type=number] {
           </div>
         </div>
         <p class="sync" id="finalize-status" style="margin-top: 8px; margin-bottom: 0;" hidden></p>
+        <div class="finalizations" id="finalizations-box">
+          <div class="finalizations-title">Most recent finalizations:</div>
+          <div class="finalizations-list" id="finalizations-list">None yet</div>
+        </div>
       </div>
     </section>
   </main>
@@ -696,12 +703,12 @@ textarea, input[type=text], input[type=number] {
     ids: shiftDefaultIds(n, 4),
     extras: [],
   }]));
-  const defaults = () => ({ empty: {}, tab: 'AM', workers: allWorkers.map((w) => ({ ...w })), shifts: newShifts() });
+  const defaults = () => ({ empty: {}, tab: 'AM', workers: allWorkers.map((w) => ({ ...w })), shifts: newShifts(), finalizations: [] });
 
   let state = load();
   let layout = parseLayout(FALLBACK_LAYOUT);
   // Shared mode: the Worker's copy of which beds are empty, keyed by bed id.
-  let shared = { on: false, version: 0, empty: {}, workers: null, shifts: null };
+  let shared = { on: false, version: 0, empty: {}, workers: null, shifts: null, finalizations: [] };
   let editing = false;
   let openMenuSlot = -1;
   const pending = [];        // changes waiting to be sent to the Worker
@@ -759,6 +766,9 @@ textarea, input[type=text], input[type=number] {
           syncShiftIds(out.shifts[n], n);
         }
         if (!SHIFTS.includes(out.tab)) out.tab = 'AM';
+        out.finalizations = Array.isArray(s.finalizations)
+          ? s.finalizations.filter((f) => f && SHIFTS.includes(f.shift) && f.at).slice(0, 3)
+          : [];
         return out;
       }
     } catch (e) { /* storage unavailable */ }
@@ -1016,6 +1026,17 @@ textarea, input[type=text], input[type=number] {
       document.body.style.overflow = '';
     }
 
+    const finList = (shared.on && Array.isArray(shared.finalizations) && shared.finalizations.length)
+      ? shared.finalizations
+      : (state.finalizations || []);
+    $('finalizations-list').textContent = finList.length
+      ? finList.slice(0, 3).map((f) => {
+          const d = new Date(f.at);
+          const stamp = isNaN(d) ? String(f.at) : d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+          return `${f.shift} — ${stamp}`;
+        }).join('\n')
+      : 'None yet';
+
     save();
   }
 
@@ -1031,20 +1052,33 @@ textarea, input[type=text], input[type=number] {
     const counts = lastCounts.slice();
     const shift = tab();
     const ids = Array.from({ length: counts.length }, (_, i) => staffId(i));
-    const names = Array.from({ length: counts.length }, (_, i) => staffName(i));
-    if (!confirm(`Finalize ${shift}? This records ${counts.join(' / ')} patients for ${names.join(', ')}.`)) return;
-    const t = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (!confirm('Finalizing this list will record which workers have heavy assignments today and rotate any extra patients next time to maintain fairness. Are you sure this list is ready to record in the schedule book?')) return;
+    const at = new Date().toISOString();
+    const prevWorkers = state.workers.map((w) => ({ ...w }));
+    const prevExtras = state.shifts[shift].extras.slice();
+    const prevFin = (state.finalizations || []).slice();
     state.workers = nextWorkerExtras(workerPool(), shift, ids, counts);
     state.shifts[shift].extras = nextFlags(state.shifts[shift].extras, counts);
+    state.finalizations = [{ shift, at }, ...prevFin].slice(0, 3);
     if (sharedShift()) {
       shared.workers = state.workers.map((w) => ({ ...w }));
-      queue({ op: 'finalize', shift, counts, workerIds: ids });
+      shared.finalizations = state.finalizations.slice();
+      queue({ op: 'finalize', shift, counts, workerIds: ids, at });
       clearTimeout(flushTimer);
       const ok = await flush();
-      setFinalizeStatus(ok ? `${shift} finalized at ${t}.` : `${shift} was not finalized. Check the message above and try again.`, !ok);
+      if (!ok) {
+        state.workers = prevWorkers;
+        state.shifts[shift].extras = prevExtras;
+        state.finalizations = prevFin;
+        shared.finalizations = prevFin.slice();
+        setFinalizeStatus(`${shift} was not finalized. Check the message above and try again.`, true);
+        update();
+      } else {
+        setFinalizeStatus('');
+      }
       return;
     }
-    setFinalizeStatus(`${shift} finalized at ${t} (saved on this device).`);
+    setFinalizeStatus('');
     update();
   }
 
@@ -1135,6 +1169,10 @@ textarea, input[type=text], input[type=number] {
     } else {
       shared.shifts = null;
     }
+    if (Array.isArray(saved.finalizations) && saved.finalizations.length) {
+      shared.finalizations = saved.finalizations.slice(0, 3);
+      state.finalizations = saved.finalizations.slice(0, 3);
+    }
     if (saved.updatedAt) setSync(formatSavedAt(saved.updatedAt));
   }
 
@@ -1149,6 +1187,7 @@ textarea, input[type=text], input[type=number] {
         ids: state.shifts[n].ids,
         extras: state.shifts[n].extras,
       }])),
+      finalizations: (state.finalizations || []).slice(0, 3),
     };
   }
 
@@ -1443,8 +1482,10 @@ textarea, input[type=text], input[type=number] {
     if (!confirm('Mark every bed occupied again and reset the worker selections to default?')) return;
     const keep = state.shifts;
     const keepWorkers = state.workers;
+    const keepFin = state.finalizations;
     state = defaults();
     state.workers = keepWorkers;
+    state.finalizations = keepFin;
     // Worker counts and worker extra status are kept.
     for (const n of SHIFTS) {
       Object.assign(state.shifts[n], {
