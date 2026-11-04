@@ -206,16 +206,74 @@ textarea, input[type=text], input[type=number] {
 .print-only { display: none; }
 .tag { font-size: 0.75rem; font-weight: 500; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; white-space: nowrap; }
 
+@page { margin: 0.45in; }
 @media print {
-  body { background: #fff; color: #000; }
-  .top .sub, .row, .hint, .worker-menu, .worker-pick .caret, .tabs, #finalize-status, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type { display: none !important; }
-  .worker-pick { border: none; background: none; color: #000; padding: 0; min-height: 0; }
-  .assign-list .range, .assign-list .rooms, .assign-list .open { padding-left: 20px; }
-  .panel { border: none; padding: 0; margin: 8px 0; }
+  :root { color-scheme: light; }
+  html, body { background: #fff !important; color: #000 !important; font-size: 14px; }
+  .top, .row, .hint, .worker-menu, .worker-pick .caret, .shift-dot, .tabs, #finalize-status, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type { display: none !important; }
+  main { max-width: none; padding: 0; margin: 0; }
+  .panel { background: #fff !important; color: #000 !important; border: none; padding: 0; margin: 0; }
   .panel > h2 { display: none; }
-  .print-only { display: block; margin: 0 0 8px; }
-  .tag { display: none; }
-  .bed, .card, .assign-list li { -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; }
+  .print-only {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #000 !important;
+    margin: 0 0 8px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #000;
+  }
+  .tag { display: none !important; }
+  .assign-list { gap: 0; border-top: 1px solid #bbb; }
+  .assign-list li {
+    background: #fff !important;
+    color: #000 !important;
+    border: none;
+    border-bottom: 1px solid #bbb;
+    border-radius: 0;
+    padding: 6px 4px;
+    display: grid;
+    grid-template-columns: minmax(120px, 1.3fr) 2fr auto;
+    align-items: baseline;
+    column-gap: 16px;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .assign-list .who { display: contents; }
+  .worker-wrap { grid-column: 1; grid-row: 1; }
+  .worker-pick {
+    border: none;
+    background: none !important;
+    color: #000 !important;
+    padding: 0;
+    min-height: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+  .assign-list .range {
+    grid-column: 2;
+    grid-row: 1;
+    padding-left: 0;
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #000 !important;
+  }
+  .assign-list .count {
+    grid-column: 3;
+    grid-row: 1;
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: #000 !important;
+    text-align: right;
+  }
+  .assign-list .rooms, .assign-list .open {
+    grid-column: 2 / -1;
+    padding-left: 0;
+    margin: 1px 0 0;
+    font-size: 0.82rem;
+    color: #333 !important;
+  }
 }
   </style>
 </head>
