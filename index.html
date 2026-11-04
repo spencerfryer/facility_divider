@@ -144,6 +144,14 @@ textarea, input[type=text], input[type=number] {
 .assign-list .range { font-size: 1.3rem; font-weight: 700; margin: 2px 0 0; }
 .assign-list .rooms, .assign-list .open { color: var(--muted); font-size: 0.9rem; margin: 2px 0 0; }
 .layout-note { font-size: 0.9rem; border-radius: 8px; padding: 8px 10px; margin: 0 0 10px; background: var(--bg); color: var(--muted); }
+.editing .room { gap: 6px; }
+.editing .room-name { width: 2.4em; }
+.sync { font-size: 0.85rem; color: var(--muted); margin: 0 0 8px; }
+.sync.error { color: var(--error); }
+.bed-tools { display: flex; gap: 4px; flex: none; align-items: center; }
+.bed-tools button { min-width: 34px; width: 34px; min-height: 44px; padding: 0; font-size: 1.3rem; line-height: 1; background: transparent; color: var(--text); border-color: var(--border); }
+.bed-tools button:disabled { opacity: 0.35; cursor: default; }
+#edit-toggle[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .layout-note.error { color: var(--error); border: 1px solid var(--error); }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 0.9rem; color: var(--muted); margin: 8px 0; }
 .check input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
@@ -151,7 +159,7 @@ textarea, input[type=text], input[type=number] {
 
 @media print {
   body { background: #fff; color: #000; }
-  .top .sub, .row, .hint, .names, #print, .foot, .layout-note, .check, section:first-of-type { display: none !important; }
+  .top .sub, .row, .hint, .names, #print, .foot, .layout-note, .sync, #edit-toggle, .bed-tools, .check, section:first-of-type { display: none !important; }
   .panel { border: none; padding: 0; margin: 8px 0; }
   .bed, .card, .assign-list li { -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; }
 }
@@ -165,8 +173,13 @@ textarea, input[type=text], input[type=number] {
 
   <main>
     <section class="panel" aria-labelledby="beds-h">
-      <h2 id="beds-h">1. Rooms</h2>
+      <div class="panel-head">
+        <h2 id="beds-h">1. Rooms</h2>
+        <button type="button" class="ghost" id="edit-toggle" aria-pressed="false" hidden>Edit beds</button>
+      </div>
       <p class="layout-note" id="layout-note" hidden></p>
+      <p class="sync" id="sync-status" hidden></p>
+      <p class="hint" id="edit-hint" hidden>Use <strong>+</strong> and <strong>−</strong> at the end of a room to add or remove a bed (up to 4 per room). Changes save for everyone.</p>
       <p class="hint">Every bed starts as occupied. Tap the empty ones to clear them.</p>
       <p class="legend"><span class="key occ"></span> Occupied <span class="key"></span> Empty <span class="census" id="census"></span></p>
       <div class="row tight">
@@ -344,6 +357,12 @@ textarea, input[type=text], input[type=number] {
   const { divideBeds } = window.Divider;
   const { parseLayout } = window.Divider;
   const STORE = 'bed-divider:v6';
+  // Address of the Cloudflare Worker that stores the shared layout and bed
+  // states (see worker/README.md). Leave empty to keep everything on this
+  // device only, using rooms.json for the rooms.
+  const WORKER_URL = '';
+  const CODE_KEY = 'bed-divider:passcode';
+  const MAX_BEDS = 4;
   // Used only if rooms.json can't be loaded (for example when this page is
   // opened straight from a file instead of from the website).
   const FALLBACK_LAYOUT = { rooms: [{ room: "1", beds: ["A", "B", "C"] }, { room: "2", beds: ["A", "B", "C"] }, { room: "3", beds: ["A", "B"] }, { room: "4", beds: ["A", "B"] }, { room: "5", beds: ["A", "B", "C"] }, { room: "6", beds: ["A", "B"] }, { room: "7", beds: ["A", "B"] }, { room: "8", beds: ["A", "B", "C"] }, { room: "9", beds: ["A", "B"] }, { room: "10", beds: ["A", "B", "C"] }, { room: "11", beds: ["A", "B"] }, { room: "12", beds: ["A", "B", "C"] }, { room: "14", beds: ["A", "B", "C"] }, { room: "15", beds: ["A", "B"] }, { room: "16", beds: ["A", "B"] }, { room: "17", beds: ["A", "B"] }, { room: "18", beds: ["A", "B", "C"] }, { room: "19", beds: ["A", "B", "C"] }, { room: "20", beds: ["A", "B", "C"] }, { room: "21", beds: ["A", "B", "C"] }, { room: "22", beds: ["A", "B"] }, { room: "23", beds: ["A", "B"] }, { room: "24", beds: ["A", "B"] }, { room: "25", beds: ["A", "B"] }, { room: "26", beds: ["A", "B", "C"] }, { room: "27", beds: ["A", "B", "C"] }, { room: "28", beds: ["A", "B", "C"] }, { room: "29", beds: ["A", "B", "C"] }, { room: "30", beds: ["A", "B", "C"] }, { room: "31", beds: ["A", "B", "C"] }, { room: "32", beds: ["A", "B", "C"] }, { room: "33", beds: ["A", "B"] }, { room: "34", beds: ["A", "B", "C"] }, { room: "35", beds: ["A", "B"] }, { room: "36", beds: ["A", "B", "C"] }, { room: "37", beds: ["A", "B", "C"] }, { room: "38", beds: ["A", "B", "C"] }] };
@@ -357,6 +376,12 @@ textarea, input[type=text], input[type=number] {
 
   let state = load();
   let layout = parseLayout(FALLBACK_LAYOUT);
+  // Shared mode: the Worker's copy of which beds are empty, keyed by bed id.
+  let shared = { on: false, version: 0, empty: {} };
+  let editing = false;
+  const pending = [];        // changes waiting to be sent to the Worker
+  let flushTimer = null;
+  let saving = false;
 
   function load() {
     try {
@@ -377,11 +402,12 @@ textarea, input[type=text], input[type=number] {
 
   const staffName = (i) => (state.names[i] || '').trim() || `Worker ${i + 1}`;
   // Bed ids look like "12A"; the label is the part after the room name.
+  const emptyMap = () => (shared.on ? shared.empty : state.empty);
   const buildRooms = () => layout.map((r) => ({
     name: r.name,
     beds: r.beds.map((label) => {
       const id = r.name + label;
-      return { id, label, occupied: !state.empty[id] };
+      return { id, label, occupied: !emptyMap()[id] };
     }),
   }));
 
@@ -427,6 +453,7 @@ textarea, input[type=text], input[type=number] {
 
     // Room grid
     grid.innerHTML = '';
+    grid.classList.toggle('editing', editing);
     grid.style.setProperty('--max-beds', Math.max(1, ...rooms.map((r) => r.beds.length)));
     for (const room of rooms) {
       const box = el('div', 'room');
@@ -441,12 +468,29 @@ textarea, input[type=text], input[type=number] {
         btn.setAttribute('aria-label', `Room ${room.name} bed ${b.label}, ${b.occupied ? 'occupied' : 'empty'}`);
         btn.textContent = b.label;
         btn.addEventListener('click', () => {
-          if (state.empty[b.id]) delete state.empty[b.id]; else state.empty[b.id] = true;
+          const map = emptyMap();
+          if (map[b.id]) delete map[b.id]; else map[b.id] = true;
+          if (shared.on) queue({ op: 'setOccupied', room: room.name, bed: b.label, occupied: !map[b.id] });
           update();
         });
         bedsRow.append(btn);
       }
       box.append(bedsRow);
+      if (editing) {
+        const tools = el('div', 'bed-tools');
+        const plus = el('button', null, '+');
+        plus.type = 'button';
+        plus.disabled = room.beds.length >= MAX_BEDS;
+        plus.setAttribute('aria-label', `Add a bed to room ${room.name}`);
+        plus.addEventListener('click', () => changeBeds(room.name, +1));
+        const minus = el('button', null, '−');
+        minus.type = 'button';
+        minus.disabled = room.beds.length <= 1;
+        minus.setAttribute('aria-label', `Remove a bed from room ${room.name}`);
+        minus.addEventListener('click', () => changeBeds(room.name, -1));
+        tools.append(plus, minus);
+        box.append(tools);
+      }
       grid.append(box);
     }
 
@@ -503,10 +547,167 @@ textarea, input[type=text], input[type=number] {
     } catch (e) {
       showNote(`${e.message} Showing the built-in room list instead.`, true);
     }
+    if (WORKER_URL) await loadShared();
     update();
   }
 
-  $('all-occ').addEventListener('click', () => { state.empty = {}; update(); });
+  // ---- Shared mode (Cloudflare Worker) ----
+  const api = (path) => WORKER_URL.replace(/\/+$/, '') + path;
+
+  function setSync(text, isError) {
+    const s = $('sync-status');
+    s.hidden = !text;
+    s.textContent = text || '';
+    s.classList.toggle('error', !!isError);
+  }
+
+  // Use the Worker's saved state: its rooms, bed counts and occupied beds.
+  function applyShared(saved) {
+    layout = parseLayout({ rooms: saved.rooms.map((r) => ({ room: r.room, beds: r.beds.map((b) => b.label) })) });
+    const empty = {};
+    saved.rooms.forEach((r) => r.beds.forEach((b) => { if (!b.occupied) empty[r.room + b.label] = true; }));
+    shared.empty = empty;
+    shared.version = saved.version || 0;
+  }
+
+  // The current layout and bed states, in the Worker's format. Sent with
+  // every save so the very first save can start from rooms.json.
+  function currentState() {
+    return { rooms: buildRooms().map((r) => ({ room: r.name, beds: r.beds.map((b) => ({ label: b.label, occupied: b.occupied })) })) };
+  }
+
+  async function loadShared(quiet) {
+    try {
+      const res = await fetch(api('/state'), { cache: 'no-store' });
+      if (res.status === 404) {
+        // Nothing saved yet: start from rooms.json; the first change saves it.
+        shared.on = true;
+        if (!quiet) setSync('Shared: changes save for everyone.');
+      } else if (!res.ok) {
+        throw new Error(`error ${res.status}`);
+      } else {
+        const saved = await res.json();
+        shared.on = true;
+        if (saved.version !== shared.version && !pending.length && !saving) applyShared(saved);
+        if (!quiet) setSync('Shared: changes save for everyone.');
+      }
+      $('edit-toggle').hidden = false;
+    } catch (e) {
+      if (!shared.on) setSync("Couldn't reach the shared bed list, so changes on this device won't be saved for others.", true);
+    }
+  }
+
+  function getCode(ask) {
+    let code = null;
+    try { code = localStorage.getItem(CODE_KEY); } catch (e) { /* ignore */ }
+    if (!code && ask) {
+      code = (window.prompt('Enter the passcode to save changes:') || '').trim();
+      if (code) { try { localStorage.setItem(CODE_KEY, code); } catch (e) { /* ignore */ } }
+    }
+    return code || null;
+  }
+  function forgetCode() { try { localStorage.removeItem(CODE_KEY); } catch (e) { /* ignore */ } }
+
+  function queue(op) {
+    pending.push(op);
+    clearTimeout(flushTimer);
+    flushTimer = setTimeout(flush, 400);
+  }
+
+  async function flush() {
+    if (saving || !pending.length) return;
+    const code = getCode(true);
+    if (!code) {
+      setSync('Not saved: the passcode is needed to make changes.', true);
+      pending.length = 0;
+      shared.version = -1;
+      await loadShared(true); update();
+      return;
+    }
+    const ops = pending.splice(0);
+    saving = true;
+    setSync('Saving…');
+    try {
+      const res = await fetch(api('/ops'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Passcode': code },
+        body: JSON.stringify({ ops, seed: currentState() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        forgetCode();
+        throw new Error('wrong passcode');
+      }
+      if (!res.ok) throw new Error(body.error || `error ${res.status}`);
+      saving = false;
+      if (!pending.length) applyShared(body);
+      const t = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      setSync(`Saved for everyone at ${t}.`);
+    } catch (e) {
+      saving = false;
+      pending.length = 0;
+      setSync(`Not saved: ${e.message}. Showing the last saved version.`, true);
+      shared.version = -1;
+      await loadShared(true);
+    }
+    update();
+    if (pending.length) flush();
+  }
+
+  function changeBeds(roomName, delta) {
+    const r = layout.find((x) => x.name === roomName);
+    if (!r) return;
+    if (delta > 0) {
+      if (r.beds.length >= MAX_BEDS) return;
+      const used = new Set(r.beds);
+      r.beds.push([...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].find((l) => !used.has(l)));
+      queue({ op: 'addBed', room: roomName });
+    } else {
+      if (r.beds.length <= 1) return;
+      const gone = r.beds.pop();
+      delete shared.empty[roomName + gone];
+      queue({ op: 'removeBed', room: roomName });
+    }
+    update();
+  }
+
+  async function setEditing(on) {
+    if (on) {
+      const code = getCode(true);
+      if (!code) return;
+      try {
+        const res = await fetch(api('/auth'), { method: 'POST', headers: { 'X-Passcode': code } });
+        if (res.status === 401) { forgetCode(); setSync('Wrong passcode.', true); return; }
+      } catch (e) {
+        setSync("Couldn't reach the shared bed list to check the passcode.", true);
+        return;
+      }
+    }
+    editing = on;
+    $('edit-toggle').setAttribute('aria-pressed', String(on));
+    $('edit-toggle').textContent = on ? 'Done' : 'Edit beds';
+    $('edit-hint').hidden = !on;
+    update();
+  }
+  $('edit-toggle').addEventListener('click', () => setEditing(!editing));
+
+  // Pick up other people's changes: check when the page comes back into
+  // view, and every 20 seconds while it's open.
+  if (WORKER_URL) {
+    const refresh = async () => {
+      if (document.hidden || pending.length || saving || !shared.on) return;
+      const before = shared.version;
+      await loadShared(true);
+      if (shared.version !== before) update();
+    };
+    document.addEventListener('visibilitychange', refresh);
+    setInterval(refresh, 20000);
+  }
+
+  $('all-occ').addEventListener('click', () => {
+    if (shared.on) { shared.empty = {}; queue({ op: 'setAll', occupied: true }); } else state.empty = {};
+    update();
+  });
 
 
   countInput.addEventListener('change', () => setStaffCount(countInput.value));
@@ -516,6 +717,7 @@ textarea, input[type=text], input[type=number] {
   $('reset').addEventListener('click', () => {
     if (!confirm('Mark every bed occupied again and clear worker names?')) return;
     state = defaults();
+    if (shared.on) { shared.empty = {}; queue({ op: 'setAll', occupied: true }); }
     namesBox.innerHTML = '';
     setStaffCount(state.staffCount);
   });
