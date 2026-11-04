@@ -4,8 +4,8 @@ A small web page that splits the occupied beds in a unit evenly among the staff 
 
 ## How it works
 
-1. **Rooms and beds.** The default layout is 37 rooms numbered 1 to 38 with no room 13 (`1-12, 14-38`), 2 beds each (A, B). Use **Edit layout** to rename rooms (ranges like `101-138` work) and tap a room's name to switch it between 2 and 3 beds. List rooms in hallway order. Then tap beds to mark them occupied or empty.
-2. **Staff.** Set how many people are working. Names are optional.
+1. **Rooms and beds.** The default layout is 37 rooms numbered 1 to 38 with no room 13 (`1-12, 14-38`), 2 beds each (A, B). Use **Edit layout** to rename rooms (ranges like `101-138` work) and tap a room's name to switch it between 2 and 3 beds. List rooms in hallway order. The first screen shows every room in one column with a block for each bed: tap a bed to fill it orange (occupied) or clear it (empty), then tap **Divide beds**.
+2. **Staff.** On the second screen, set how many people are working. Names are optional.
 3. **Assignments.** Rooms are divided into one block per person:
    - **A room is never split between people**, and each person gets a **contiguous run of rooms**, so assignments stay geographically together.
    - Among all such splits, the calculator picks the one with the **most even patient counts**. Because rooms can't be split, counts may differ by a couple of patients.

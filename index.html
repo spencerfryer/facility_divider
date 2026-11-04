@@ -17,6 +17,9 @@
   --empty-bg: #ffffff;
   --empty-text: #8a929d;
   --radius: 10px;
+  --orange: #f5891f;
+  --on-orange: #241300;
+  --bed-line: #b9c0c9;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -28,6 +31,7 @@
     --accent: #4c8dff;
     --empty-bg: #1a1f25;
     --empty-text: #6f7884;
+    --bed-line: #4a5360;
   }
 }
 * { box-sizing: border-box; }
@@ -121,25 +125,44 @@ textarea, input[type=text], input[type=number] {
 
 .foot { color: var(--muted); font-size: 0.85rem; padding-bottom: 32px; }
 
-.room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
-.room { border: 2px solid var(--border); border-radius: 8px; padding: 4px 6px 6px; }
+.room-grid { display: flex; flex-direction: column; gap: 8px; max-width: 520px; }
+.room { display: flex; align-items: stretch; gap: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 6px; background: var(--surface); }
 .room-name {
-  display: flex; justify-content: space-between; align-items: baseline; gap: 4px; width: 100%;
-  background: none; border: none; color: var(--text); padding: 2px 2px 4px; min-height: 0;
-  font-weight: 700; text-align: left; cursor: default;
+  flex: none; width: 3.6em; display: flex; flex-direction: column; justify-content: center; align-items: center;
+  background: none; border: none; color: var(--text); padding: 0; min-height: 0;
+  font-weight: 700; font-size: 1.25rem; cursor: default;
 }
 .room-name:disabled { opacity: 1; }
 .editing .room-name { cursor: pointer; color: var(--accent); text-decoration: underline; }
-.bed-count { font-size: 0.75rem; font-weight: 500; color: var(--muted); }
-.beds-row { display: flex; gap: 4px; }
-.beds-row .bed { flex: 1; min-height: 40px; min-width: 0; padding: 4px 0; font-weight: 650; }
+.bed-count { font-size: 0.7rem; font-weight: 500; color: var(--muted); }
+.beds-row { display: flex; gap: 8px; flex: 1; }
+.beds-row .bed {
+  flex: 1; min-width: 0; min-height: 52px; padding: 0; border-radius: 8px;
+  border: 2px solid var(--bed-line); background: transparent; color: var(--empty-text);
+  font-weight: 700; font-size: 1rem;
+}
+.beds-row .bed.occupied { background: var(--orange); border-color: var(--orange); color: var(--on-orange); }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; color: var(--muted); font-size: 0.9rem; margin: 0 0 10px; }
+.key { display: inline-block; width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--bed-line); }
+.key.occ { background: var(--orange); border-color: var(--orange); }
+.legend .key + .key, .legend .key:not(:first-child) { margin-left: 8px; }
+.census { flex-basis: 100%; }
+.nextbar {
+  position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin: 0 -16px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: var(--bg); border-top: 1px solid var(--border);
+}
+.nextbar button { font-weight: 650; }
+#census-bar { color: var(--muted); font-size: 0.9rem; }
+.back { margin-top: 16px; }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 0.9rem; color: var(--muted); margin: 8px 0; }
 .check input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
 .card .span { margin: 0; font-size: 0.9rem; color: var(--muted); }
 
 @media print {
   body { background: #fff; color: #000; }
-  .top .sub, .row, .hint, .names, #print, .foot, #edit-toggle, .bed-editor, .check { display: none !important; }
+  .top .sub, .row, .hint, .names, #print, .foot, #edit-toggle, .bed-editor, .check, .nextbar, .back, #page-beds { display: none !important; }
+  #page-divide { display: block !important; }
   .panel { border: none; padding: 0; margin: 8px 0; }
   .bed, .card { -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; }
 }
@@ -148,13 +171,14 @@ textarea, input[type=text], input[type=number] {
 <body>
   <header class="top">
     <h1>Bed Divider</h1>
-    <p class="sub">Mark which beds are occupied, set how many people are working, and get an even split by room.</p>
+    <p class="sub" id="sub-text">Tap each bed that has a patient in it. Then divide the rooms among the staff on shift.</p>
   </header>
 
   <main>
+   <div id="page-beds">
     <section class="panel" aria-labelledby="beds-h">
       <div class="panel-head">
-        <h2 id="beds-h">1. Rooms and beds</h2>
+        <h2 id="beds-h">Rooms</h2>
         <button type="button" class="link" id="edit-toggle" aria-expanded="false">Edit layout</button>
       </div>
       <div id="layout-editor" class="bed-editor" hidden>
@@ -165,16 +189,24 @@ textarea, input[type=text], input[type=number] {
         </div>
         <p class="hint"><strong>While this panel is open, tap a room's name to switch it between 2 and 3 beds.</strong> Close it when you're done. Your layout is remembered on this device.</p>
       </div>
-      <p class="hint">Tap a bed to mark it occupied or empty. <span id="census"></span></p>
+      <p class="legend"><span class="key occ"></span> Occupied <span class="key"></span> Empty <span class="census" id="census"></span></p>
       <div class="row tight">
         <button type="button" class="ghost" id="all-occ">All occupied</button>
         <button type="button" class="ghost" id="all-empty">All empty</button>
       </div>
       <div id="room-grid" class="room-grid" role="group" aria-label="Rooms"></div>
     </section>
+    <div class="nextbar">
+      <span id="census-bar"></span>
+      <button type="button" id="go-divide">Divide beds →</button>
+    </div>
+   </div>
+
+   <div id="page-divide" hidden>
+    <button type="button" class="ghost back" id="go-back">← Back to rooms</button>
 
     <section class="panel" aria-labelledby="staff-h">
-      <h2 id="staff-h">2. Staff working</h2>
+      <h2 id="staff-h">Staff working</h2>
       <div class="row">
         <label for="staff-count" class="inline">Number of people</label>
         <div class="stepper">
@@ -192,11 +224,12 @@ textarea, input[type=text], input[type=number] {
 
     <section class="panel" aria-labelledby="result-h">
       <div class="panel-head">
-        <h2 id="result-h">3. Assignments</h2>
+        <h2 id="result-h">Assignments</h2>
         <button type="button" class="ghost" id="print">Print</button>
       </div>
       <div id="results" class="results" aria-live="polite"></div>
     </section>
+   </div>
   </main>
 
   <footer class="foot">
@@ -462,17 +495,12 @@ textarea, input[type=text], input[type=number] {
     const { groups } = state.splitRooms
       ? divideBeds(allBeds, state.staffCount)
       : divideRooms(rooms, state.staffCount);
-    const ownerOf = {};
-    groups.forEach((g, i) => [...g.occupied, ...g.empty].forEach((id) => { ownerOf[id] = i; }));
 
     // Room grid
     grid.innerHTML = '';
     grid.classList.toggle('editing', editing);
     for (const room of rooms) {
       const box = el('div', 'room');
-      const roomOwner = ownerOf[room.beds[0].id];
-      const single = room.beds.every((b) => ownerOf[b.id] === roomOwner);
-      if (single && roomOwner != null) box.style.borderColor = color(roomOwner);
 
       const head = el('button', 'room-name');
       head.type = 'button';
@@ -495,15 +523,11 @@ textarea, input[type=text], input[type=number] {
 
       const bedsRow = el('div', 'beds-row');
       for (const b of room.beds) {
-        const owner = ownerOf[b.id];
-        const btn = el('button', 'bed ' + (b.occupied ? 'occupied' : 'empty') + (owner != null ? ' owned' : ''));
+        const btn = el('button', 'bed ' + (b.occupied ? 'occupied' : 'empty'));
         btn.type = 'button';
         btn.setAttribute('aria-pressed', String(b.occupied));
-        btn.setAttribute('aria-label', `Bed ${b.id}, ${b.occupied ? 'occupied' : 'empty'}` + (owner != null ? `, ${staffName(owner)}` : ''));
-        if (b.occupied && owner != null) { btn.style.background = color(owner); btn.style.borderColor = color(owner); }
-        else if (owner != null) btn.style.color = color(owner);
+        btn.setAttribute('aria-label', `Room ${room.name} bed ${b.id.slice(room.name.length)}, ${b.occupied ? 'occupied' : 'empty'}`);
         btn.textContent = b.id.slice(room.name.length);
-        btn.title = b.occupied ? staffName(owner) : 'empty';
         btn.addEventListener('click', () => {
           if (state.occupied[b.id]) delete state.occupied[b.id]; else state.occupied[b.id] = true;
           update();
@@ -516,6 +540,7 @@ textarea, input[type=text], input[type=number] {
 
     const occCount = allBeds.filter((b) => b.occupied).length;
     $('census').textContent = `${occCount} of ${allBeds.length} beds occupied in ${rooms.length} rooms.`;
+    $('census-bar').textContent = `${occCount} of ${allBeds.length} occupied`;
 
     // Result cards
     results.innerHTML = '';
@@ -585,7 +610,23 @@ textarea, input[type=text], input[type=number] {
     setStaffCount(state.staffCount);
   });
 
+  // Two screens: rooms first, then staff and assignments. The URL hash keeps
+  // the phone's back button working.
+  function showPage() {
+    const divide = location.hash === '#divide';
+    $('page-beds').hidden = divide;
+    $('page-divide').hidden = !divide;
+    $('sub-text').textContent = divide
+      ? 'Set how many people are working. Each person gets a block of rooms next to each other.'
+      : 'Tap each bed that has a patient in it. Then divide the rooms among the staff on shift.';
+    window.scrollTo(0, 0);
+  }
+  $('go-divide').addEventListener('click', () => { location.hash = 'divide'; });
+  $('go-back').addEventListener('click', () => { location.hash = ''; });
+  window.addEventListener('hashchange', showPage);
+
   setStaffCount(state.staffCount);
+  showPage();
 })();
   </script>
 </body>
