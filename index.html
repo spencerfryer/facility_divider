@@ -1295,6 +1295,7 @@ textarea, input[type=text], input[type=number] {
 
   $('import-workers').addEventListener('click', () => {
     closeToolsMenu();
+    if (!confirm('Importing a worker list will completely replace the entire worker list for all shifts. Do you want to proceed?')) return;
     importFileInput.value = '';
     importFileInput.click();
   });
@@ -1310,10 +1311,6 @@ textarea, input[type=text], input[type=number] {
       imported = parseWorkers(data);
     } catch (e) {
       alert(`Could not import worker list: ${e.message}`);
-      importFileInput.value = '';
-      return;
-    }
-    if (!confirm('Replace the current worker list with the imported file? This will completely overwrite the current worker list for all shifts.')) {
       importFileInput.value = '';
       return;
     }
