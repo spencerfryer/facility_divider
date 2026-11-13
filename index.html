@@ -1529,7 +1529,7 @@ textarea, input[type=text], input[type=number] {
       } else {
         const sx = bedStartX + sp.c * (bedW + bedGap) - bedGap / 2;
         d = `M ${leftX} ${yBelow.toFixed(1)} L ${sx.toFixed(1)} ${yBelow.toFixed(1)} L ${sx.toFixed(1)} ${yAbove.toFixed(1)} L ${rightX} ${yAbove.toFixed(1)}`;
-        boundaryY.push(yAbove);
+        boundaryY.push((yAbove + yBelow) / 2);
       }
       out.push(`<path d="${d}" fill="none" stroke="#fff" stroke-width="4.0" stroke-linecap="round" stroke-linejoin="round"/>`);
       out.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`);
@@ -1623,7 +1623,7 @@ textarea, input[type=text], input[type=number] {
       } else {
         const sx = bedStartX + sp.c * (bedW + bedGap) - bedGap / 2;
         cmds.push(`${leftX} ${yBelow.toFixed(1)} m ${sx.toFixed(1)} ${yBelow.toFixed(1)} l ${sx.toFixed(1)} ${yAbove.toFixed(1)} l ${rightX} ${yAbove.toFixed(1)} l S`);
-        boundaryY.push(yAbove);
+        boundaryY.push((yAbove + yBelow) / 2);
       }
     }
 
