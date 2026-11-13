@@ -264,15 +264,16 @@ textarea, input[type=text], input[type=number] {
 @media print {
   :root { color-scheme: light; }
   html { background: #fff !important; margin: 0; padding: 0; height: auto !important; }
-  body { background: #fff !important; color: #000 !important; margin: 0; padding: 0.15in 0.3in; height: auto !important; min-height: 0 !important; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { background: #fff !important; color: #000 !important; margin: 0; padding: 0.5in 0.4in 0.25in; height: auto !important; min-height: 0 !important; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .top, .row, .hint, .worker-menu, .worker-modal, .worker-pick .caret, .shift-dot, .tabs, #finalize-status, .finalizations, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type, #results { display: none !important; }
-  main, .panel, #shift-panel, .print-body, #print-room-map { break-after: avoid; page-break-after: avoid; }
+  main, .panel, #shift-panel, #print-shift, .print-body, #print-room-map { break-after: avoid; page-break-after: avoid; }
   main { max-width: none; padding: 0; margin: 0; }
   .panel { background: #fff !important; color: #000 !important; border: none; padding: 0; margin: 0; }
   .panel > h2 { display: none; }
   #print-shift {
-    display: block;
+    display: block !important;
     font-size: 14pt;
+    line-height: 1.2;
     font-weight: 700;
     color: #000 !important;
     text-align: left;
@@ -292,7 +293,7 @@ textarea, input[type=text], input[type=number] {
     width: 440pt;
     height: auto;
     max-width: 100%;
-    max-height: 8.6in;
+    max-height: 8.2in;
     margin: 0;
   }
   .tag { display: none !important; }
