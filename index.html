@@ -2133,8 +2133,8 @@ textarea, input[type=text], input[type=number] {
         d = `M ${leftX} ${yBelow.toFixed(1)} L ${sx.toFixed(1)} ${yBelow.toFixed(1)} L ${sx.toFixed(1)} ${yAbove.toFixed(1)} L ${rightX} ${yAbove.toFixed(1)}`;
         boundaryY.push((yAbove + yBelow) / 2);
       }
-      out.push(`<path d="${d}" fill="none" stroke="#fff" stroke-width="4.0" stroke-linecap="round" stroke-linejoin="round"/>`);
-      out.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`);
+      out.push(`<path d="${d}" fill="none" stroke="#fff" stroke-width="3.0" stroke-linecap="round" stroke-linejoin="round"/>`);
+      out.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>`);
     }
 
     // Staff brackets and 10.5pt labels vertically centered on each bracket
@@ -2292,7 +2292,7 @@ textarea, input[type=text], input[type=number] {
       const rightX = gridRightX + 4;
       const yAbove = midYPdf(sp.r);
       const yBelow = midYPdf(sp.r + 1);
-      cmds.push(`0 0 0 RG 2.2 w [ ] 0 d`);
+      cmds.push(`0 0 0 RG 1.2 w [ ] 0 d`);
       if (sp.c === 0) {
         cmds.push(`${leftX} ${yAbove.toFixed(1)} m ${rightX} ${yAbove.toFixed(1)} l S`);
         boundaryY.push(yAbove);
