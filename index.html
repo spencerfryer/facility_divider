@@ -2070,6 +2070,33 @@ textarea, input[type=text], input[type=number] {
     return { txt, isOutlier, compact: b.multiplier > 1 || isOutlier };
   }
 
+  /** Returns closed [x, y] polygon vertices enclosing assignment block `k` across both bed grid and text cell. */
+  function assignmentBlockPoly(k, spansLen, splits, leftRailX, roofRightX, bedStartX, bedW, bedGap, midFn, topFrameY, botFrameY) {
+    const sxFor = (sp) => bedStartX + sp.c * (bedW + bedGap) - bedGap / 2;
+    const pts = [];
+    const p = k > 0 ? splits[k - 1] : null;
+    if (!p) {
+      pts.push([leftRailX, topFrameY], [roofRightX, topFrameY]);
+    } else if (p.c === 0) {
+      const yA = midFn(p.r);
+      pts.push([leftRailX, yA], [roofRightX, yA]);
+    } else {
+      const yA = midFn(p.r), yB = midFn(p.r + 1), sx = sxFor(p);
+      pts.push([leftRailX, yB], [sx, yB], [sx, yA], [roofRightX, yA]);
+    }
+    const n = k < spansLen - 1 ? splits[k] : null;
+    if (!n) {
+      pts.push([roofRightX, botFrameY], [leftRailX, botFrameY]);
+    } else if (n.c === 0) {
+      const yA = midFn(n.r);
+      pts.push([roofRightX, yA], [leftRailX, yA]);
+    } else {
+      const yA = midFn(n.r), yB = midFn(n.r + 1), sx = sxFor(n);
+      pts.push([roofRightX, yA], [sx, yA], [sx, yB], [leftRailX, yB]);
+    }
+    return pts;
+  }
+
   function renderPrintMap(rooms, groups, allBeds, loads, owners) {
     const container = $('print-room-map');
     if (!container) return;
@@ -2084,6 +2111,7 @@ textarea, input[type=text], input[type=number] {
     const bedStartX = 28, bedW = Math.floor((88 - (maxBeds - 1) * 8) / maxBeds), bedGap = 8;
     const gridRightX = bedStartX + maxBeds * bedW + (maxBeds - 1) * bedGap + 6;
     const leftRailX = gridLeftX + 1, rightRailX = gridRightX;
+    const roofRightX = W - 1;
     const midY = (r) => topY + r * rowStep - gap / 2;
     const topFrameY = midY(0), botFrameY = midY(R);
 
@@ -2091,7 +2119,14 @@ textarea, input[type=text], input[type=number] {
     const out = [];
     out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}pt" height="${H}pt" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMin meet" font-family="system-ui, -apple-system, sans-serif">`);
 
-    // Rooms and beds
+    // 15% grey shading for odd-numbered assignments (1, 3, 5, ...)
+    spans.forEach((sp, k) => {
+      if ((sp.idx + 1) % 2 !== 1) return;
+      const pts = assignmentBlockPoly(k, spans.length, splits, leftRailX, roofRightX, bedStartX, bedW, bedGap, midY, topFrameY, botFrameY);
+      out.push(`<path d="M ${pts.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(' L ')} Z" fill="#d9d9d9"/>`);
+    });
+
+    // Rooms and beds (unfilled so odd-assignment background shows cleanly)
     let flatIdx = 0;
     rooms.forEach((room, r) => {
       const ry = topY + r * rowStep;
@@ -2105,38 +2140,32 @@ textarea, input[type=text], input[type=number] {
         const fSize = disp.compact ? '5.0' : (b.occupied ? '7.5' : '7.2');
         const textY = (ry + boxH * (disp.compact ? 0.72 : 0.76)).toFixed(1);
         if (b.occupied) {
-          const fill = disp.isOutlier ? '#fff' : '#e8e8e8';
           const sw = disp.isOutlier ? '1.5' : '0.85';
-          out.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bedW.toFixed(1)}" height="${bh.toFixed(1)}" rx="1.8" fill="${fill}" stroke="#000" stroke-width="${sw}"/>`);
+          out.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bedW.toFixed(1)}" height="${bh.toFixed(1)}" rx="1.8" fill="none" stroke="#000" stroke-width="${sw}"/>`);
           out.push(`<text x="${(bx + bedW / 2).toFixed(1)}" y="${textY}" text-anchor="middle" font-size="${fSize}" font-weight="700" fill="#000">${xmlEscape(disp.txt)}</text>`);
         } else {
-          out.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bedW.toFixed(1)}" height="${bh.toFixed(1)}" rx="1.8" fill="#fff" stroke="#888" stroke-width="0.7" stroke-dasharray="2,1.6"/>`);
-          out.push(`<text x="${(bx + bedW / 2).toFixed(1)}" y="${textY}" text-anchor="middle" font-size="${fSize}" font-weight="600" fill="#777">${xmlEscape(disp.txt)}</text>`);
+          out.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bedW.toFixed(1)}" height="${bh.toFixed(1)}" rx="1.8" fill="none" stroke="#777" stroke-width="0.7" stroke-dasharray="2,1.6"/>`);
+          out.push(`<text x="${(bx + bedW / 2).toFixed(1)}" y="${textY}" text-anchor="middle" font-size="${fSize}" font-weight="600" fill="#666">${xmlEscape(disp.txt)}</text>`);
         }
       });
     });
 
     // Division lines across the room grid + full 1pt enclosing grid borders
-    const roofRightX = W - 1;
     const rightEdgeY = [];
-    const divHalos = [], divLines = [];
+    const divLines = [];
     for (const sp of splits) {
       const yAbove = midY(sp.r);
       const yBelow = midY(sp.r + 1);
-      let dGrid, dFull;
+      let dFull;
       if (sp.c === 0) {
-        dGrid = `M ${leftRailX} ${yAbove.toFixed(1)} L ${rightRailX} ${yAbove.toFixed(1)}`;
         dFull = `M ${leftRailX} ${yAbove.toFixed(1)} L ${roofRightX} ${yAbove.toFixed(1)}`;
       } else {
         const sx = bedStartX + sp.c * (bedW + bedGap) - bedGap / 2;
-        dGrid = `M ${leftRailX} ${yBelow.toFixed(1)} L ${sx.toFixed(1)} ${yBelow.toFixed(1)} L ${sx.toFixed(1)} ${yAbove.toFixed(1)} L ${rightRailX} ${yAbove.toFixed(1)}`;
-        dFull = `${dGrid} L ${roofRightX} ${yAbove.toFixed(1)}`;
+        dFull = `M ${leftRailX} ${yBelow.toFixed(1)} L ${sx.toFixed(1)} ${yBelow.toFixed(1)} L ${sx.toFixed(1)} ${yAbove.toFixed(1)} L ${roofRightX} ${yAbove.toFixed(1)}`;
       }
       rightEdgeY.push(yAbove);
-      divHalos.push(`<path d="${dGrid}" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`);
       divLines.push(`<path d="${dFull}" fill="none" stroke="#808080" stroke-width="1.0" stroke-linecap="round" stroke-linejoin="round"/>`);
     }
-    out.push(...divHalos);
     out.push(`<path d="M ${leftRailX} ${topFrameY.toFixed(1)} L ${roofRightX} ${topFrameY.toFixed(1)} L ${roofRightX} ${botFrameY.toFixed(1)} L ${leftRailX} ${botFrameY.toFixed(1)} Z" fill="none" stroke="#808080" stroke-width="1.0" stroke-linecap="round" stroke-linejoin="round"/>`);
     out.push(`<line x1="${rightRailX}" y1="${topFrameY.toFixed(1)}" x2="${rightRailX}" y2="${botFrameY.toFixed(1)}" stroke="#808080" stroke-width="1.0" stroke-linecap="round"/>`);
     out.push(...divLines);
@@ -2240,11 +2269,18 @@ textarea, input[type=text], input[type=number] {
     const bedStartX = gridLeftX + 28, bedW = Math.floor((88 - (maxBeds - 1) * 8) / maxBeds), bedGap = 8;
     const gridRightX = bedStartX + maxBeds * bedW + (maxBeds - 1) * bedGap + 6;
     const leftRailX = gridLeftX + 1, rightRailX = gridRightX;
+    const roofRightX = 612 - marginX;
     const rowTopPdf = (r) => gridTop - r * rowStep;
     const midYPdf = (r) => rowTopPdf(r) + gap / 2;
     const topFrameY = midYPdf(0), botFrameY = midYPdf(R);
 
     const { spans, splits, zoneForFlat } = computePrintSplits(rooms, groups, allBeds, loads, owners);
+
+    spans.forEach((sp, k) => {
+      if ((sp.idx + 1) % 2 !== 1) return;
+      const pts = assignmentBlockPoly(k, spans.length, splits, leftRailX, roofRightX, bedStartX, bedW, bedGap, midYPdf, topFrameY, botFrameY);
+      cmds.push(`0.85 0.85 0.85 rg ${pts.map(([x, y], idx) => `${x.toFixed(1)} ${y.toFixed(1)} ${idx === 0 ? 'm' : 'l'}`).join(' ')} h f`);
+    });
 
     let flatIdx = 0;
     rooms.forEach((room, r) => {
@@ -2263,18 +2299,16 @@ textarea, input[type=text], input[type=number] {
         const txPdf = bx + (bedW - tw) / 2;
         const tyPdf = rBot + boxH * (disp.compact ? 0.28 : 0.24);
         if (b.occupied) {
-          const fill = disp.isOutlier ? '1 1 1' : '0.91 0.91 0.91';
           const sw = disp.isOutlier ? '1.5' : '0.85';
-          cmds.push(`${fill} rg 0 0 0 RG ${sw} w [ ] 0 d ${bx.toFixed(1)} ${by.toFixed(1)} ${bedW.toFixed(1)} ${bh.toFixed(1)} re B`);
+          cmds.push(`0 0 0 RG ${sw} w [ ] 0 d ${bx.toFixed(1)} ${by.toFixed(1)} ${bedW.toFixed(1)} ${bh.toFixed(1)} re S`);
           cmds.push(`0 0 0 rg BT /F2 ${ptSize} Tf ${txPdf.toFixed(1)} ${tyPdf.toFixed(1)} Td (${pdfEscape(disp.txt)}) Tj ET`);
         } else {
-          cmds.push(`1 1 1 rg 0.55 0.55 0.55 RG 0.65 w [2 1.6] 0 d ${bx.toFixed(1)} ${by.toFixed(1)} ${bedW.toFixed(1)} ${bh.toFixed(1)} re B`);
-          cmds.push(`0.45 0.45 0.45 rg BT /F1 ${ptSize} Tf ${txPdf.toFixed(1)} ${tyPdf.toFixed(1)} Td (${pdfEscape(disp.txt)}) Tj ET`);
+          cmds.push(`0.47 0.47 0.47 RG 0.65 w [2 1.6] 0 d ${bx.toFixed(1)} ${by.toFixed(1)} ${bedW.toFixed(1)} ${bh.toFixed(1)} re S`);
+          cmds.push(`0.4 0.4 0.4 rg BT /F1 ${ptSize} Tf ${txPdf.toFixed(1)} ${tyPdf.toFixed(1)} Td (${pdfEscape(disp.txt)}) Tj ET`);
         }
       });
     });
 
-    const roofRightX = 612 - marginX;
     cmds.push(`0.5 0.5 0.5 RG 1.0 w [ ] 0 d 1 j 1 J ${leftRailX.toFixed(1)} ${botFrameY.toFixed(1)} ${(roofRightX - leftRailX).toFixed(1)} ${(topFrameY - botFrameY).toFixed(1)} re S`);
     cmds.push(`0.5 0.5 0.5 RG 1.0 w [ ] 0 d 1 j 1 J ${rightRailX.toFixed(1)} ${botFrameY.toFixed(1)} m ${rightRailX.toFixed(1)} ${topFrameY.toFixed(1)} l S`);
     const rightEdgeY = [];
