@@ -1529,26 +1529,51 @@ textarea, input[type=text], input[type=number] {
     return new Blob([pdf], { type: 'application/pdf' });
   }
 
+  let printScroll = null;
+  function restorePrintScroll() {
+    if (!printScroll) return;
+    const { x, y } = printScroll;
+    printScroll = null;
+    window.scrollTo(x, y);
+    requestAnimationFrame(() => window.scrollTo(x, y));
+    setTimeout(() => window.scrollTo(x, y), 60);
+    setTimeout(() => window.scrollTo(x, y), 200);
+  }
+  window.addEventListener('beforeprint', () => {
+    if (!printScroll) printScroll = { x: window.scrollX, y: window.scrollY };
+  });
+  window.addEventListener('afterprint', restorePrintScroll);
+  if (window.matchMedia) {
+    const mq = window.matchMedia('print');
+    const onMq = (e) => { if (!e.matches) restorePrintScroll(); };
+    if (mq.addEventListener) mq.addEventListener('change', onMq);
+    else if (mq.addListener) mq.addListener(onMq);
+  }
+
   countInput.addEventListener('change', () => setStaffCount(countInput.value));
   $('staff-minus').addEventListener('click', () => setStaffCount(workers() - 1));
   $('staff-plus').addEventListener('click', () => setStaffCount(workers() + 1));
   $('print').addEventListener('click', async () => {
+    printScroll = { x: window.scrollX, y: window.scrollY };
     if (window.navigator.standalone) {
       try {
         const blob = buildAssignmentsPdf();
         const file = new File([blob], `${tab()}-assignments.pdf`, { type: 'application/pdf' });
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file], title: `${tab()} assignments` });
+          restorePrintScroll();
           return;
         }
         const url = URL.createObjectURL(blob);
         window.open(url, '_blank');
+        restorePrintScroll();
         return;
       } catch (e) {
-        if (e && e.name === 'AbortError') return;
+        if (e && e.name === 'AbortError') { restorePrintScroll(); return; }
       }
     }
     window.print();
+    restorePrintScroll();
   });
   $('finalize').addEventListener('click', finalize);
   const tabs = [...document.querySelectorAll('.tabs [role=tab]')];
