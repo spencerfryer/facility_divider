@@ -2105,9 +2105,9 @@ textarea, input[type=text], input[type=number] {
         const fSize = disp.compact ? '5.0' : (b.occupied ? '7.5' : '7.2');
         const textY = (ry + boxH * (disp.compact ? 0.72 : 0.76)).toFixed(1);
         if (b.occupied) {
-          const fill = disp.isOutlier ? '#fde68a' : '#dfe7f2';
-          const stroke = disp.isOutlier ? '#b45309' : '#111';
-          out.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bedW.toFixed(1)}" height="${bh.toFixed(1)}" rx="1.8" fill="${fill}" stroke="${stroke}" stroke-width="0.85"/>`);
+          const fill = disp.isOutlier ? '#fff' : '#e8e8e8';
+          const sw = disp.isOutlier ? '1.5' : '0.85';
+          out.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bedW.toFixed(1)}" height="${bh.toFixed(1)}" rx="1.8" fill="${fill}" stroke="#000" stroke-width="${sw}"/>`);
           out.push(`<text x="${(bx + bedW / 2).toFixed(1)}" y="${textY}" text-anchor="middle" font-size="${fSize}" font-weight="700" fill="#000">${xmlEscape(disp.txt)}</text>`);
         } else {
           out.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bedW.toFixed(1)}" height="${bh.toFixed(1)}" rx="1.8" fill="#fff" stroke="#888" stroke-width="0.7" stroke-dasharray="2,1.6"/>`);
@@ -2143,7 +2143,7 @@ textarea, input[type=text], input[type=number] {
       const tw = measureTextW(pillTxt, '600 5.6px system-ui, -apple-system, sans-serif');
       const pw = Math.max(22, tw + 5);
       const ph = 7.8;
-      out.push(`<rect x="${px.toFixed(1)}" y="${(baseY - 7.1).toFixed(1)}" width="${pw.toFixed(1)}" height="${ph.toFixed(1)}" rx="${(ph / 2).toFixed(1)}" fill="#f2f4f7" stroke="#bbb" stroke-width="0.5"/>`);
+      out.push(`<rect x="${px.toFixed(1)}" y="${(baseY - 7.1).toFixed(1)}" width="${pw.toFixed(1)}" height="${ph.toFixed(1)}" rx="${(ph / 2).toFixed(1)}" fill="#f4f4f4" stroke="#999" stroke-width="0.5"/>`);
       out.push(`<text x="${(px + pw / 2).toFixed(1)}" y="${(baseY - 1.4).toFixed(1)}" text-anchor="middle" font-size="5.6" font-weight="600" fill="#333">${xmlEscape(pillTxt)}</text>`);
       return pw;
     };
@@ -2207,7 +2207,7 @@ textarea, input[type=text], input[type=number] {
     const ph = 7.8;
     const py = baselineY - 0.8;
     const r = ph / 2, k = r * 0.5523;
-    cmds.push('0.95 0.96 0.97 rg 0.72 0.72 0.72 RG 0.5 w [ ] 0 d');
+    cmds.push('0.96 0.96 0.96 rg 0.6 0.6 0.6 RG 0.5 w [ ] 0 d');
     cmds.push(`${(x + r).toFixed(1)} ${py.toFixed(1)} m`);
     cmds.push(`${(x + pw - r).toFixed(1)} ${py.toFixed(1)} l`);
     cmds.push(`${(x + pw - r + k).toFixed(1)} ${py.toFixed(1)} ${(x + pw).toFixed(1)} ${(py + r - k).toFixed(1)} ${(x + pw).toFixed(1)} ${(py + r).toFixed(1)} c`);
@@ -2268,9 +2268,9 @@ textarea, input[type=text], input[type=number] {
         const txPdf = bx + (bedW - tw) / 2;
         const tyPdf = rBot + boxH * (disp.compact ? 0.28 : 0.24);
         if (b.occupied) {
-          const fill = disp.isOutlier ? '0.99 0.90 0.54' : '0.87 0.91 0.95';
-          const stroke = disp.isOutlier ? '0.71 0.33 0.04' : '0.1 0.1 0.1';
-          cmds.push(`${fill} rg ${stroke} RG 0.85 w [ ] 0 d ${bx.toFixed(1)} ${by.toFixed(1)} ${bedW.toFixed(1)} ${bh.toFixed(1)} re B`);
+          const fill = disp.isOutlier ? '1 1 1' : '0.91 0.91 0.91';
+          const sw = disp.isOutlier ? '1.5' : '0.85';
+          cmds.push(`${fill} rg 0 0 0 RG ${sw} w [ ] 0 d ${bx.toFixed(1)} ${by.toFixed(1)} ${bedW.toFixed(1)} ${bh.toFixed(1)} re B`);
           cmds.push(`0 0 0 rg BT /F2 ${ptSize} Tf ${txPdf.toFixed(1)} ${tyPdf.toFixed(1)} Td (${pdfEscape(disp.txt)}) Tj ET`);
         } else {
           cmds.push(`1 1 1 rg 0.55 0.55 0.55 RG 0.65 w [2 1.6] 0 d ${bx.toFixed(1)} ${by.toFixed(1)} ${bedW.toFixed(1)} ${bh.toFixed(1)} re B`);
