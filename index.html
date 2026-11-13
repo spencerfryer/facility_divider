@@ -263,8 +263,10 @@ textarea, input[type=text], input[type=number] {
 @page { size: letter portrait; margin: 0; }
 @media print {
   :root { color-scheme: light; }
-  html, body { background: #fff !important; color: #000 !important; margin: 0; padding: 0.3in 0.4in; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html { background: #fff !important; margin: 0; padding: 0; height: auto !important; }
+  body { background: #fff !important; color: #000 !important; margin: 0; padding: 0.15in 0.3in; height: auto !important; min-height: 0 !important; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .top, .row, .hint, .worker-menu, .worker-modal, .worker-pick .caret, .shift-dot, .tabs, #finalize-status, .finalizations, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type, #results { display: none !important; }
+  main, .panel, #shift-panel, .print-body, #print-room-map { break-after: avoid; page-break-after: avoid; }
   main { max-width: none; padding: 0; margin: 0; }
   .panel { background: #fff !important; color: #000 !important; border: none; padding: 0; margin: 0; }
   .panel > h2 { display: none; }
@@ -274,14 +276,12 @@ textarea, input[type=text], input[type=number] {
     font-weight: 700;
     color: #000 !important;
     text-align: left;
-    margin: 0 0 8pt;
+    margin: 0 0 6pt;
     padding-bottom: 4pt;
     border-bottom: 1.5pt solid #000;
   }
   .print-body {
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
+    display: block;
   }
   #print-room-map {
     display: block !important;
@@ -289,11 +289,11 @@ textarea, input[type=text], input[type=number] {
   }
   #print-room-map svg {
     display: block;
-    width: 460pt;
+    width: 440pt;
     height: auto;
     max-width: 100%;
-    max-height: 9.0in;
-    margin: 0 auto;
+    max-height: 8.6in;
+    margin: 0;
   }
   .tag { display: none !important; }
 }
@@ -904,7 +904,7 @@ textarea, input[type=text], input[type=number] {
       t.tabIndex = on ? 0 : -1;
     }
     $('shift-panel').setAttribute('aria-labelledby', `tab-${tab()}`);
-    $('print-shift').textContent = `${tab()} Assignments ${new Date().toLocaleDateString()}`;
+    $('print-shift').textContent = `${new Date().toLocaleDateString()} ${tab()} Assignments`;
     if (document.activeElement !== countInput) countInput.value = workers();
 
     // Assignment list: one line per worker with their bed range.
@@ -1482,13 +1482,13 @@ textarea, input[type=text], input[type=number] {
     if (!container) return;
     const R = rooms.length || 1;
     const maxBeds = Math.max(1, ...rooms.map((r) => r.beds.length));
-    const W = 460, H = 640;
+    const W = 440, H = 600;
     const topY = 2, availH = H - topY - 2;
     const rowStep = availH / R;
-    const boxH = Math.min(14.5, rowStep - 3.0);
+    const boxH = Math.min(13.5, rowStep - 2.8);
     const gap = rowStep - boxH;
-    const gridLeftX = 36;
-    const bedStartX = 72, bedW = Math.floor((156 - (maxBeds - 1) * 6) / maxBeds), bedGap = 6;
+    const gridLeftX = 4;
+    const bedStartX = 40, bedW = Math.floor((156 - (maxBeds - 1) * 6) / maxBeds), bedGap = 6;
     const gridRightX = bedStartX + maxBeds * bedW + (maxBeds - 1) * bedGap + 8;
     const midY = (r) => topY + r * rowStep - gap / 2;
 
@@ -1500,17 +1500,17 @@ textarea, input[type=text], input[type=number] {
     rooms.forEach((room, r) => {
       const ry = topY + r * rowStep;
       out.push(`<rect x="${gridLeftX}" y="${ry.toFixed(1)}" width="${(gridRightX - gridLeftX).toFixed(1)}" height="${boxH.toFixed(1)}" rx="3" fill="none" stroke="#ccc" stroke-width="0.75"/>`);
-      out.push(`<text x="${gridLeftX + 18}" y="${(ry + boxH * 0.73).toFixed(1)}" text-anchor="middle" font-size="9.8" font-weight="700" fill="#000">${xmlEscape(room.name)}</text>`);
+      out.push(`<text x="${gridLeftX + 18}" y="${(ry + boxH * 0.74).toFixed(1)}" text-anchor="middle" font-size="9.2" font-weight="700" fill="#000">${xmlEscape(room.name)}</text>`);
       room.beds.forEach((b, c) => {
         const bx = bedStartX + c * (bedW + bedGap);
-        const by = ry + 1.1;
-        const bh = boxH - 2.2;
+        const by = ry + 1.0;
+        const bh = boxH - 2.0;
         if (b.occupied) {
           out.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bedW.toFixed(1)}" height="${bh.toFixed(1)}" rx="2.2" fill="#dfe7f2" stroke="#111" stroke-width="1"/>`);
-          out.push(`<text x="${(bx + bedW / 2).toFixed(1)}" y="${(ry + boxH * 0.73).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="700" fill="#000">${xmlEscape(b.label)}</text>`);
+          out.push(`<text x="${(bx + bedW / 2).toFixed(1)}" y="${(ry + boxH * 0.74).toFixed(1)}" text-anchor="middle" font-size="9.0" font-weight="700" fill="#000">${xmlEscape(b.label)}</text>`);
         } else {
           out.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bedW.toFixed(1)}" height="${bh.toFixed(1)}" rx="2.2" fill="#fff" stroke="#888" stroke-width="0.85" stroke-dasharray="2.5,2"/>`);
-          out.push(`<text x="${(bx + bedW / 2).toFixed(1)}" y="${(ry + boxH * 0.73).toFixed(1)}" text-anchor="middle" font-size="9.0" font-weight="600" fill="#777">${xmlEscape(b.label)}</text>`);
+          out.push(`<text x="${(bx + bedW / 2).toFixed(1)}" y="${(ry + boxH * 0.74).toFixed(1)}" text-anchor="middle" font-size="8.6" font-weight="600" fill="#777">${xmlEscape(b.label)}</text>`);
         }
       });
     });
@@ -1568,14 +1568,14 @@ textarea, input[type=text], input[type=number] {
     const rooms = buildRooms();
     const allBeds = rooms.flatMap((r) => r.beds);
     const { groups } = divideBeds(allBeds, workers(), extras());
-    const title = `${tab()} Assignments ${new Date().toLocaleDateString()}`;
+    const title = `${new Date().toLocaleDateString()} ${tab()} Assignments`;
     const cmds = [];
     let topLineY = 754;
     cmds.push(`0 0 0 rg BT /F2 14 Tf 36 ${topLineY} Td (${pdfEscape(title)}) Tj ET`);
     topLineY -= 6;
     cmds.push(`0 0 0 RG 1.2 w 36 ${topLineY} m 576 ${topLineY} l S`);
 
-    // Centered visual room grid + brackets + 11.5pt top-aligned labels on US Letter (612x792pt)
+    // Left-aligned visual room grid + brackets + 10.5pt vertically centered labels on US Letter (612x792pt)
     const R = rooms.length || 1;
     const maxBeds = Math.max(1, ...rooms.map((r) => r.beds.length));
     const gridTop = topLineY - 10;
@@ -1584,7 +1584,7 @@ textarea, input[type=text], input[type=number] {
     const rowStep = availH / R;
     const boxH = Math.min(15.2, rowStep - 3.0);
     const gap = rowStep - boxH;
-    const gridLeftX = 112;
+    const gridLeftX = 38;
     const bedStartX = gridLeftX + 36, bedW = Math.floor((156 - (maxBeds - 1) * 6) / maxBeds), bedGap = 6;
     const gridRightX = bedStartX + maxBeds * bedW + (maxBeds - 1) * bedGap + 8;
     const rowTopPdf = (r) => gridTop - r * rowStep;
