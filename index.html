@@ -1558,7 +1558,6 @@ textarea, input[type=text], input[type=number] {
     // Rooms and beds
     rooms.forEach((room, r) => {
       const ry = topY + r * rowStep;
-      out.push(`<rect x="${gridLeftX}" y="${ry.toFixed(1)}" width="${(gridRightX - gridLeftX).toFixed(1)}" height="${boxH.toFixed(1)}" rx="3" fill="none" stroke="#ccc" stroke-width="0.75"/>`);
       out.push(`<text x="${gridLeftX + 18}" y="${(ry + boxH * 0.74).toFixed(1)}" text-anchor="middle" font-size="9.2" font-weight="700" fill="#000">${xmlEscape(room.name)}</text>`);
       room.beds.forEach((b, c) => {
         const bx = bedStartX + c * (bedW + bedGap);
@@ -1713,7 +1712,6 @@ textarea, input[type=text], input[type=number] {
     rooms.forEach((room, r) => {
       const rTop = rowTopPdf(r);
       const rBot = rTop - boxH;
-      cmds.push(`0.8 0.8 0.8 RG 0.5 w [ ] 0 d ${gridLeftX} ${rBot.toFixed(1)} ${(gridRightX - gridLeftX).toFixed(1)} ${boxH.toFixed(1)} re S`);
       cmds.push(`0 0 0 rg BT /F2 9.5 Tf ${(gridLeftX + 10).toFixed(1)} ${(rBot + boxH * 0.27).toFixed(1)} Td (${pdfEscape(room.name)}) Tj ET`);
       room.beds.forEach((b, c) => {
         const bx = bedStartX + c * (bedW + bedGap);
