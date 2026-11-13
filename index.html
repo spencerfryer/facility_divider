@@ -2133,7 +2133,7 @@ textarea, input[type=text], input[type=number] {
         boundaryY.push((yAbove + yBelow) / 2);
       }
       out.push(`<path d="${d}" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>`);
-      out.push(`<path d="${d}" fill="none" stroke="#808080" stroke-width="2.0" stroke-dasharray="4,3" stroke-linecap="butt" stroke-linejoin="round"/>`);
+      out.push(`<path d="${d}" fill="none" stroke="#808080" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round"/>`);
     }
 
     // Staff brackets and labels vertically centered on each bracket
@@ -2285,7 +2285,7 @@ textarea, input[type=text], input[type=number] {
       const rightX = gridRightX + 4;
       const yAbove = midYPdf(sp.r);
       const yBelow = midYPdf(sp.r + 1);
-      cmds.push(`0.5 0.5 0.5 RG 2.0 w [4 3] 0 d 1 j`);
+      cmds.push(`0.5 0.5 0.5 RG 2.0 w [ ] 0 d 1 j`);
       if (sp.c === 0) {
         cmds.push(`${leftX} ${yAbove.toFixed(1)} m ${rightX} ${yAbove.toFixed(1)} l S`);
         boundaryY.push(yAbove);
