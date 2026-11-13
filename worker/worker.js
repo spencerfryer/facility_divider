@@ -100,6 +100,7 @@ export function nextWorkerExtras(workers, shift, assignedIds, counts) {
     id: String(w.id),
     name: String(w.name),
     shift: w.shift,
+    sex: normalizeSex(w.sex),
     shiftsWorked: Math.max(0, Math.floor(Number(w.shiftsWorked) || 0)),
     extraCount: Math.max(0, Math.floor(Number(w.extraCount) || 0)),
   }));
@@ -123,6 +124,40 @@ export function nextWorkerExtras(workers, shift, assignedIds, counts) {
 
 const clampWorkers = (n) => Math.max(1, Math.min(MAX_WORKERS, Math.floor(Number(n)) || 1));
 
+function normalizeSex(v) {
+  const s = String(v || '').trim().toUpperCase();
+  if (s === 'M' || s === 'MALE') return 'M';
+  if (s === 'F' || s === 'FEMALE') return 'F';
+  return '';
+}
+
+function clampMultiplier(v) {
+  const n = Math.floor(Number(v));
+  return n === 2 || n === 3 ? n : 1;
+}
+
+function cleanConflict(list) {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const id of list.slice(0, 50)) {
+    const c = String(id || '').trim().slice(0, 40);
+    if (c && !seen.has(c)) { seen.add(c); out.push(c); }
+  }
+  return out;
+}
+
+function cleanBed(b) {
+  return {
+    label: b.label,
+    occupied: !!b.occupied,
+    multiplier: clampMultiplier(b.multiplier),
+    noMales: !!b.noMales,
+    noFemales: !!b.noFemales,
+    conflict: cleanConflict(b.conflict),
+  };
+}
+
 function cleanWorkers(list) {
   if (!Array.isArray(list)) return [];
   const seen = new Set();
@@ -134,9 +169,10 @@ function cleanWorkers(list) {
     const shift = WORKER_GROUPS.includes(w.shift) ? w.shift : 'AM';
     if (!id || !name || seen.has(id)) continue;
     seen.add(id);
+    const sex = normalizeSex(w.sex);
     const shiftsWorked = Math.max(0, Math.min(100000, Math.floor(Number(w.shiftsWorked) || 0)));
     const extraCount = Math.max(0, Math.min(100000, Math.floor(Number(w.extraCount) || 0)));
-    out.push({ id, name, shift, shiftsWorked, extraCount });
+    out.push({ id, name, shift, sex, shiftsWorked, extraCount });
   }
   return out;
 }
@@ -158,7 +194,7 @@ export function cleanState(s) {
   return {
     version: Number.isInteger(s.version) ? s.version : 0,
     updatedAt: s.updatedAt || null,
-    rooms: s.rooms.map((r) => ({ room: r.room, beds: r.beds.map((b) => ({ label: b.label, occupied: b.occupied })) })),
+    rooms: s.rooms.map((r) => ({ room: r.room, beds: r.beds.map(cleanBed) })),
     workers: cleanWorkers(s.workers),
     shifts,
   };
@@ -167,6 +203,7 @@ export function cleanState(s) {
 /**
  * Apply changes to a state and return the new state. Ops:
  *   { op: "setOccupied", room: "12", bed: "A", occupied: false }
+ *   { op: "setBedProps", room: "12", bed: "A", multiplier: 2, noMales: true, noFemales: false, conflict: ["am1"] }
  *   { op: "addBed", room: "12" }       adds the next letter, up to MAX_BEDS; new bed starts occupied
  *   { op: "removeBed", room: "12" }    removes the room's last bed, keeps at least one
  *   { op: "setAll", occupied: true }   marks every bed occupied (or empty)
@@ -189,12 +226,21 @@ export function applyOps(state, ops) {
         b.occupied = !!o.occupied;
         break;
       }
+      case 'setBedProps': {
+        const b = findRoom(o.room).beds.find((x) => x.label === o.bed);
+        if (!b) throw new Error(`no bed ${o.room}${o.bed}`);
+        if (o.multiplier != null) b.multiplier = clampMultiplier(o.multiplier);
+        if (o.noMales != null) b.noMales = !!o.noMales;
+        if (o.noFemales != null) b.noFemales = !!o.noFemales;
+        if (o.conflict != null) b.conflict = cleanConflict(o.conflict);
+        break;
+      }
       case 'addBed': {
         const r = findRoom(o.room);
         if (r.beds.length >= MAX_BEDS) throw new Error(`room ${r.room} already has ${MAX_BEDS} beds`);
         const used = new Set(r.beds.map((b) => b.label));
         const label = [...LETTERS].find((l) => !used.has(l));
-        r.beds.push({ label, occupied: true });
+        r.beds.push(cleanBed({ label, occupied: true }));
         break;
       }
       case 'removeBed': {

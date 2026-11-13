@@ -204,3 +204,67 @@ test('nextFlags flags workers above the minimum and resets a full round', () => 
   // Even split: nothing changes.
   assert.deepStrictEqual(nextFlags([true, false], [3, 3]), [true, false]);
 });
+
+test('multiplier weights bed difficulty when dividing assignments', () => {
+  const weightedBeds = [
+    { id: '1A', occupied: true, multiplier: 3 },
+    { id: '1B', occupied: true, multiplier: 1 },
+    { id: '2A', occupied: true, multiplier: 1 },
+    { id: '2B', occupied: true, multiplier: 1 },
+  ];
+  const r = divideBeds(weightedBeds, 2);
+  assert.deepStrictEqual(r.loads, [3, 3]);
+  assert.deepStrictEqual(r.groups.map((g) => g.occupied), [['1A'], ['1B', '2A', '2B']]);
+});
+
+test('noMales, noFemales, and conflict reassign beds to eligible workers while staying mostly contiguous', () => {
+  const roomBeds = [
+    { id: '1A', occupied: true },
+    { id: '1B', occupied: true, noMales: true },
+    { id: '1C', occupied: true },
+    { id: '2A', occupied: true },
+    { id: '2B', occupied: true, conflict: ['w2'] },
+    { id: '2C', occupied: true },
+  ];
+  const team = [
+    { id: 'w1', name: 'Sam', sex: 'M' },
+    { id: 'w2', name: 'Pat', sex: 'F' },
+  ];
+  const r = divideBeds(roomBeds, 2, { workers: team });
+  assert.strictEqual(r.unmet.length, 0);
+  // 1B (noMales) cannot go to w1 (M), 2B (conflict: ['w2']) cannot go to w2
+  assert.ok(!r.groups[0].occupied.includes('1B'));
+  assert.ok(r.groups[1].occupied.includes('1B'));
+  assert.ok(!r.groups[1].occupied.includes('2B'));
+  assert.ok(r.groups[0].occupied.includes('2B'));
+  assert.deepStrictEqual(r.loads, [3, 3]);
+});
+
+test('divideBeds reports unmet rules when no eligible worker is on shift', () => {
+  const impossible = [
+    { id: '1A', occupied: true, noFemales: true, noMales: true },
+    { id: '1B', occupied: true },
+  ];
+  const team = [
+    { id: 'w1', name: 'Sam', sex: 'M' },
+    { id: 'w2', name: 'Pat', sex: 'F' },
+  ];
+  const r = divideBeds(impossible, 2, { workers: team });
+  assert.strictEqual(r.unmet.length, 1);
+  assert.strictEqual(r.unmet[0].bedId, '1A');
+});
+
+test('parseWorkers and workers.json include worker sex', () => {
+  const parsed = parseWorkers({
+    AM: [{ id: 'a1', name: 'Alex', sex: 'm' }, { id: 'a2', name: 'Bri' }],
+    PM: [{ id: 'p1', name: 'Cam' }],
+    NOC: [{ id: 'n1', name: 'Dee' }],
+  });
+  assert.deepStrictEqual(parsed.map((w) => [w.id, w.sex]), [['a1', 'M'], ['a2', ''], ['p1', ''], ['n1', '']]);
+  const realWorkers = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'workers.json'), 'utf8'));
+  const all = parseWorkers(realWorkers);
+  assert.ok(all.length > 0);
+  for (const w of all) {
+    assert.ok(w.sex === 'M' || w.sex === 'F', `Missing valid sex for ${w.id}`);
+  }
+});

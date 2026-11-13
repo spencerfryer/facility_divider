@@ -24,7 +24,11 @@ const call = (env, method, path, { body, code } = {}) => worker.fetch(new Reques
 
 test('applyOps toggles, adds and removes beds', () => {
   let s = applyOps(seed(), [{ op: 'setOccupied', room: '1', bed: 'B', occupied: false }, { op: 'addBed', room: '1' }]);
-  assert.deepStrictEqual(s.rooms[0].beds, [{ label: 'A', occupied: true }, { label: 'B', occupied: false }, { label: 'C', occupied: true }]);
+  assert.deepStrictEqual(s.rooms[0].beds, [
+    { label: 'A', occupied: true, multiplier: 1, noMales: false, noFemales: false, conflict: [] },
+    { label: 'B', occupied: false, multiplier: 1, noMales: false, noFemales: false, conflict: [] },
+    { label: 'C', occupied: true, multiplier: 1, noMales: false, noFemales: false, conflict: [] },
+  ]);
   s = applyOps(s, [{ op: 'removeBed', room: '2' }]);
   assert.strictEqual(s.rooms[1].beds.length, 2);
   s = applyOps(s, [{ op: 'setAll', occupied: true }]);
@@ -161,4 +165,34 @@ test('finalize updates per-worker shiftsWorked and extraCount in KV and preserve
     { id: 'am2', shiftsWorked: 1, extraCount: 0 },
     { id: 'pm1', shiftsWorked: 1, extraCount: 1 },
   ]);
+});
+
+test('setBedProps persists bed difficulty, sex restrictions, conflicts, and worker sex across ops', async () => {
+  const env = fakeEnv();
+  const res = await call(env, 'POST', '/ops', {
+    code: 'secret-code',
+    body: {
+      seed: {
+        ...seed(),
+        workers: [
+          { id: 'am1', name: 'Alex', shift: 'AM', sex: 'M', shiftsWorked: 0, extraCount: 0 },
+          { id: 'am2', name: 'Bri', shift: 'AM', sex: 'F', shiftsWorked: 0, extraCount: 0 },
+        ],
+      },
+      ops: [
+        { op: 'setBedProps', room: '1', bed: 'B', multiplier: 3, noMales: true, noFemales: false, conflict: ['am2', 'am2'] },
+      ],
+    },
+  });
+  assert.strictEqual(res.status, 200);
+  const s = await res.json();
+  const bedB = s.rooms[0].beds.find((b) => b.label === 'B');
+  assert.strictEqual(bedB.multiplier, 3);
+  assert.strictEqual(bedB.noMales, true);
+  assert.strictEqual(bedB.noFemales, false);
+  assert.deepStrictEqual(bedB.conflict, ['am2']);
+  assert.deepStrictEqual(s.workers.map((w) => [w.id, w.sex]), [['am1', 'M'], ['am2', 'F']]);
+
+  const saved = await (await call(env, 'GET', '/state')).json();
+  assert.strictEqual(saved.rooms[0].beds.find((b) => b.label === 'B').multiplier, 3);
 });

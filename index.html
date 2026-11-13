@@ -206,11 +206,45 @@ textarea, input[type=text], input[type=number] {
 .beds-row { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 /* Every bed is the width it would have in the fullest room, left-aligned. */
 .beds-row .bed {
-  flex: 0 0 calc((100% - (var(--max-beds) - 1) * 8px) / var(--max-beds)); min-width: 0; overflow: hidden; text-overflow: ellipsis; height: 52px; min-height: 52px; padding: 0; border-radius: 8px;
+  flex: 0 0 calc((100% - (var(--max-beds) - 1) * 8px) / var(--max-beds)); min-width: 0; overflow: hidden; text-overflow: ellipsis; height: 52px; min-height: 52px; padding: 2px; border-radius: 8px;
   border: 2px solid var(--bed-line); background: transparent; color: var(--empty-text);
   font-weight: 700; font-size: 1rem;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; gap: 2px;
 }
 .beds-row .bed.occupied { background: var(--orange); border-color: var(--orange); color: var(--on-orange); }
+.editing .beds-row .bed:not(.add-bed),
+.editing .beds-row .bed.occupied:not(.add-bed) {
+  background: #4b5563; border-color: #6b7280; color: #ffffff;
+}
+.bed-meta { font-size: 0.65rem; font-weight: 600; opacity: 0.92; line-height: 1; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bed-modal {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.bed-modal-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  width: 100%; max-width: 340px; padding: 14px;
+  display: flex; flex-direction: column; gap: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+.bed-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+.bed-modal-head h3 { margin: 0; font-size: 1.15rem; font-weight: 700; }
+.bed-modal .bed-menu-opt {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 14px; min-height: 46px;
+  font-size: 1.05rem; font-weight: 600; text-align: left;
+}
+.bed-modal .bed-menu-opt[aria-pressed="true"] {
+  background: var(--tab-active); color: var(--accent-text); border-color: var(--tab-active);
+}
+.bed-modal .bed-menu-sub { font-size: 0.82rem; font-weight: 500; color: var(--muted); text-align: right; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bed-modal .bed-menu-opt[aria-pressed="true"] .bed-menu-sub { color: var(--accent-text); }
+.rule-warning {
+  background: rgba(255, 123, 114, 0.12); border: 1px solid var(--error); color: var(--error);
+  border-radius: 8px; padding: 8px 12px; margin: 0 0 10px; font-size: 0.9rem;
+}
 .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; color: var(--muted); font-size: 0.9rem; margin: 0 0 10px; }
 .key { display: inline-block; width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--bed-line); }
 .key.occ { background: var(--orange); border-color: var(--orange); }
@@ -265,7 +299,7 @@ textarea, input[type=text], input[type=number] {
   :root { color-scheme: light; }
   html { background: #fff !important; margin: 0; padding: 0; height: auto !important; }
   body { background: #fff !important; color: #000 !important; margin: 0; padding: 0.45in 0.9in 0.35in; height: auto !important; min-height: 0 !important; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .top, .row, .hint, .worker-menu, .worker-modal, .worker-pick .caret, .shift-dot, .tabs, #finalize-status, .finalizations, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type, #results { display: none !important; }
+  .top, .row, .hint, .worker-menu, .worker-modal, .bed-modal, .rule-warning, .worker-pick .caret, .shift-dot, .tabs, #finalize-status, .finalizations, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type, #results { display: none !important; }
   main, .panel, #shift-panel, #print-shift, .print-body, #print-room-map, #print-stamp { break-after: avoid; page-break-after: avoid; }
   main { max-width: none; padding: 0; margin: 0; }
   .panel { background: #fff !important; color: #000 !important; border: none; padding: 0; margin: 0; }
@@ -321,7 +355,7 @@ textarea, input[type=text], input[type=number] {
         <button type="button" class="ghost" id="edit-toggle" aria-pressed="false" hidden>Edit beds</button>
       </div>
       <p class="layout-note" id="layout-note" hidden></p>
-      <p class="hint" id="edit-hint" hidden>Tap <strong>+</strong> in a room to add a bed (up to 3), or <strong>−</strong> beside a room to remove its last bed. Changes save for everyone.</p>
+      <p class="hint" id="edit-hint" hidden>Tap a bed to set 2x, 3x, no males, no females, or employee conflict. Tap <strong>+</strong> to add a bed (up to 3), or <strong>−</strong> to remove the last bed. Changes save for everyone.</p>
       <p class="legend"><span class="key occ"></span> Occupied <span class="key"></span> Empty <span class="census" id="census"></span></p>
       <div id="room-grid" class="room-grid" role="group" aria-label="Rooms"></div>
       <div class="row" style="margin-top: 12px; margin-bottom: 0;">
@@ -347,6 +381,7 @@ textarea, input[type=text], input[type=number] {
           </div>
         </div>
         <p class="hint">Click on worker name to assign or change worker</p>
+        <p class="rule-warning" id="rule-warning" hidden></p>
         <div class="print-body">
           <div class="print-only" id="print-room-map" aria-hidden="true"></div>
           <ol id="results" class="assign-list" aria-live="polite"></ol>
@@ -380,6 +415,16 @@ textarea, input[type=text], input[type=number] {
   <footer class="foot">
     <p>Rooms, beds, and worker assignments are shared through the passcode-protected bed list. <button type="button" class="link" id="reset">Reset everything</button></p>
   </footer>
+
+  <div id="bed-modal" class="bed-modal" role="dialog" aria-modal="true" aria-labelledby="bed-modal-title" hidden>
+    <div class="bed-modal-card">
+      <div class="bed-modal-head">
+        <h3 id="bed-modal-title">Bed</h3>
+        <button type="button" class="ghost" id="bed-modal-close">Done</button>
+      </div>
+      <div id="bed-modal-body" style="display: flex; flex-direction: column; gap: 8px;"></div>
+    </div>
+  </div>
 
   <div id="worker-modal" class="worker-modal" role="dialog" aria-modal="true" aria-labelledby="worker-modal-title" hidden>
     <div class="worker-modal-head">
@@ -460,55 +505,219 @@ textarea, input[type=text], input[type=number] {
     return getsExtra.map((x) => base + (x ? 1 : 0));
   }
 
+  function normalizeSex(v) {
+    const s = String(v || '').trim().toUpperCase();
+    if (s === 'M' || s === 'MALE') return 'M';
+    if (s === 'F' || s === 'FEMALE') return 'F';
+    return '';
+  }
+
+  function clampMultiplier(v) {
+    const n = Math.floor(Number(v));
+    return n === 2 || n === 3 ? n : 1;
+  }
+
+  function cleanConflictList(list) {
+    if (!Array.isArray(list)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const id of list) {
+      const c = String(id || '').trim();
+      if (c && !seen.has(c)) { seen.add(c); out.push(c); }
+    }
+    return out;
+  }
+
+  function canAssignBed(bed, worker) {
+    if (!worker || !bed) return true;
+    const sex = normalizeSex(worker.sex);
+    if (bed.noMales && sex === 'M') return false;
+    if (bed.noFemales && sex === 'F') return false;
+    if (Array.isArray(bed.conflict) && worker.id && bed.conflict.includes(worker.id)) return false;
+    return true;
+  }
+
   /**
-   * @param {{id: string, occupied: boolean}[]} beds  beds in layout order
+   * @param {{id: string, occupied: boolean, multiplier?: number, noMales?: boolean, noFemales?: boolean, conflict?: string[]}[]} beds  beds in layout order
    * @param {number} staffCount
-   * @param {boolean[]} [flags]  workers who already had an extra patient this round
-   * @returns {{groups: {occupied: string[], empty: string[]}[], unassignedEmpty: string[]}}
+   * @param {number[]|boolean[]|{scores?: number[]|boolean[], workers?: {id: string, sex?: string}[]}} [flagsOrOpts]
+   * @returns {{groups: {occupied: string[], empty: string[]}[], unassignedEmpty: string[], loads: number[], owners: number[], unmet: {bedId: string, occupied: boolean}[]}}
    */
-  function divideBeds(beds, staffCount, flags) {
+  function divideBeds(beds, staffCount, flagsOrOpts) {
+    const isOpts = flagsOrOpts && typeof flagsOrOpts === 'object' && !Array.isArray(flagsOrOpts);
+    const scores = isOpts ? flagsOrOpts.scores : flagsOrOpts;
+    const workersMeta = isOpts && Array.isArray(flagsOrOpts.workers) ? flagsOrOpts.workers : null;
+
     const n = Math.max(0, Math.floor(Number(staffCount) || 0));
     const groups = [];
     for (let i = 0; i < n; i++) groups.push({ occupied: [], empty: [] });
     if (n === 0) {
-      return { groups, unassignedEmpty: beds.filter((b) => !b.occupied).map((b) => b.id) };
+      return {
+        groups,
+        unassignedEmpty: beds.filter((b) => !b.occupied).map((b) => b.id),
+        loads: [],
+        owners: new Array(beds.length).fill(-1),
+        unmet: [],
+      };
     }
 
+    const weights = beds.map((b) => clampMultiplier(b.multiplier));
     const occupiedIdx = [];
-    beds.forEach((b, i) => { if (b.occupied) occupiedIdx.push(i); });
-    const sizes = evenSizes(occupiedIdx.length, n, flags);
-
-    // owner[i] = group index owning bed i (occupied beds only for now)
-    const owner = new Array(beds.length).fill(-1);
-    let k = 0;
-    sizes.forEach((size, g) => {
-      for (let j = 0; j < size; j++) owner[occupiedIdx[k++]] = g;
-    });
-
-    // Empty beds: belong to the group of the nearest occupied bed before them
-    // in the list; leading empties go to the first group that has any beds.
-    const firstGroupWithBeds = sizes.findIndex((s) => s > 0);
-    let current = firstGroupWithBeds >= 0 ? firstGroupWithBeds : 0;
+    let totalWeight = 0;
     beds.forEach((b, i) => {
       if (b.occupied) {
-        current = owner[i];
-        groups[current].occupied.push(b.id);
-      } else {
-        groups[current].empty.push(b.id);
+        occupiedIdx.push(i);
+        totalWeight += weights[i];
       }
     });
 
-    // If nobody has occupied beds (census of zero), spread empties evenly instead.
-    if (occupiedIdx.length === 0) {
-      groups.forEach((g) => { g.empty = []; });
+    const targets = evenSizes(totalWeight, n, scores);
+    const owner = new Array(beds.length).fill(-1);
+
+    if (occupiedIdx.length > 0) {
+      const m = occupiedIdx.length;
+      const allUnit = occupiedIdx.every((idx) => weights[idx] === 1);
+      if (allUnit) {
+        let k = 0;
+        targets.forEach((size, g) => {
+          for (let j = 0; j < size; j++) owner[occupiedIdx[k++]] = g;
+        });
+      } else {
+        const pref = new Array(m + 1).fill(0);
+        for (let k = 0; k < m; k++) pref[k + 1] = pref[k] + weights[occupiedIdx[k]];
+        let prev = new Array(m + 1).fill(Infinity);
+        prev[0] = 0;
+        const cuts = Array.from({ length: n }, () => new Array(m + 1).fill(0));
+        for (let g = 0; g < n; g++) {
+          const curr = new Array(m + 1).fill(Infinity);
+          const tgt = targets[g];
+          for (let q = 0; q <= m; q++) {
+            for (let p = 0; p <= q; p++) {
+              if (prev[p] === Infinity) continue;
+              const L = pref[q] - pref[p];
+              const emptyPen = (m >= n && p === q) ? 0.01 : 0;
+              const cost = prev[p] + (L - tgt) * (L - tgt) + emptyPen;
+              if (cost < curr[q]) {
+                curr[q] = cost;
+                cuts[g][q] = p;
+              }
+            }
+          }
+          prev = curr;
+        }
+        let q = m;
+        for (let g = n - 1; g >= 0; g--) {
+          const p = cuts[g][q];
+          for (let k = p; k < q; k++) owner[occupiedIdx[k]] = g;
+          q = p;
+        }
+      }
+
+      const firstGroupWithBeds = owner.find((g) => g >= 0);
+      let current = firstGroupWithBeds >= 0 ? firstGroupWithBeds : 0;
+      beds.forEach((b, i) => {
+        if (b.occupied) current = owner[i];
+        else owner[i] = current;
+      });
+    } else {
       const emptySizes = evenSizes(beds.length, n);
       let e = 0;
       emptySizes.forEach((size, g) => {
-        for (let j = 0; j < size; j++) groups[g].empty.push(beds[e++].id);
+        for (let j = 0; j < size; j++) owner[e++] = g;
       });
     }
 
-    return { groups, unassignedEmpty: [] };
+    const loads = new Array(n).fill(0);
+    for (const i of occupiedIdx) loads[owner[i]] += weights[i];
+
+    const unmet = [];
+    if (workersMeta && workersMeta.length) {
+      const imb = (arr) => arr.reduce((s, L, idx) => s + (L - targets[idx]) * (L - targets[idx]), 0);
+      const isBetter = (a, b) => !b || a[0] < b[0] || (a[0] === b[0] && (a[1] < b[1] || (a[1] === b[1] && (a[2] < b[2] || (a[2] === b[2] && a[3] < b[3])))));
+
+      for (let pass = 0; pass < 2; pass++) {
+        let changed = false;
+        for (const i of occupiedIdx) {
+          const g = owner[i];
+          if (canAssignBed(beds[i], workersMeta[g])) continue;
+          const wi = weights[i];
+          let best = null;
+          let bestAct = null;
+
+          // Candidate 1: swap with an occupied bed j owned by eligible worker h
+          for (const j of occupiedIdx) {
+            const h = owner[j];
+            if (h === g) continue;
+            if (!canAssignBed(beds[i], workersMeta[h]) || !canAssignBed(beds[j], workersMeta[g])) continue;
+            const wj = weights[j];
+            const candLoads = loads.slice();
+            candLoads[g] += wj - wi;
+            candLoads[h] += wi - wj;
+            const tuple = [imb(candLoads), 0, Math.abs(h - g), Math.abs(j - i)];
+            if (isBetter(tuple, best)) {
+              best = tuple;
+              bestAct = { kind: 'swap', j, h };
+            }
+          }
+
+          // Candidate 2: 1-way move to any eligible worker h
+          for (let h = 0; h < n; h++) {
+            if (h === g || !canAssignBed(beds[i], workersMeta[h])) continue;
+            const candLoads = loads.slice();
+            candLoads[g] -= wi;
+            candLoads[h] += wi;
+            const tuple = [imb(candLoads), 1, Math.abs(h - g), 0];
+            if (isBetter(tuple, best)) {
+              best = tuple;
+              bestAct = { kind: 'move', h };
+            }
+          }
+
+          if (!bestAct) {
+            if (pass === 0) unmet.push({ bedId: beds[i].id, occupied: true });
+            continue;
+          }
+          changed = true;
+          if (bestAct.kind === 'swap') {
+            const { j, h } = bestAct;
+            loads[g] += weights[j] - wi;
+            loads[h] += wi - weights[j];
+            owner[i] = h;
+            owner[j] = g;
+          } else {
+            const { h } = bestAct;
+            loads[g] -= wi;
+            loads[h] += wi;
+            owner[i] = h;
+          }
+        }
+        if (!changed) break;
+      }
+
+      // Empty beds violating restrictions
+      beds.forEach((b, i) => {
+        if (b.occupied) return;
+        const g = owner[i];
+        if (canAssignBed(b, workersMeta[g])) return;
+        let bestH = -1;
+        let bestScore = Infinity;
+        for (let h = 0; h < n; h++) {
+          if (h === g || !canAssignBed(b, workersMeta[h])) continue;
+          const score = Math.abs(h - g);
+          if (score < bestScore) { bestScore = score; bestH = h; }
+        }
+        if (bestH >= 0) owner[i] = bestH;
+        else unmet.push({ bedId: b.id, occupied: false });
+      });
+    }
+
+    beds.forEach((b, i) => {
+      const g = owner[i];
+      if (b.occupied) groups[g].occupied.push(b.id);
+      else groups[g].empty.push(b.id);
+    });
+
+    return { groups, unassignedEmpty: [], loads, owners: owner, unmet };
   }
 
 
@@ -589,9 +798,10 @@ textarea, input[type=text], input[type=number] {
         if (!id) throw new Error(`${shift} worker "${name}" in workers.json has no "id".`);
         if (seenIds.has(id)) throw new Error(`Worker id "${id}" is listed twice in workers.json.`);
         seenIds.add(id);
+        const sex = isStr ? '' : normalizeSex(w && w.sex);
         const shiftsWorked = isStr ? 0 : Math.max(0, Math.floor(Number(w && w.shiftsWorked) || 0));
         const extraCount = isStr ? 0 : Math.max(0, Math.floor(Number(w && w.extraCount) || 0));
-        return { id, name, shift, shiftsWorked, extraCount };
+        return { id, name, shift, sex, shiftsWorked, extraCount };
       });
       group.sort((a, b) => a.name.localeCompare(b.name));
       out.push(...group);
@@ -611,6 +821,7 @@ textarea, input[type=text], input[type=number] {
       id: String(w.id),
       name: String(w.name),
       shift: w.shift,
+      sex: normalizeSex(w.sex),
       shiftsWorked: Math.max(0, Math.floor(Number(w.shiftsWorked) || 0)),
       extraCount: Math.max(0, Math.floor(Number(w.extraCount) || 0)),
     }));
@@ -632,14 +843,14 @@ textarea, input[type=text], input[type=number] {
     return out;
   }
 
-  const api = { evenSizes, pickExtras, nextFlags, workerRatio, nextWorkerExtras, nextWorkerStats: nextWorkerExtras, divideBeds, parseBedList, parseLayout, parseWorkers };
+  const api = { evenSizes, pickExtras, nextFlags, workerRatio, nextWorkerExtras, nextWorkerStats: nextWorkerExtras, normalizeSex, clampMultiplier, cleanConflictList, canAssignBed, divideBeds, parseBedList, parseLayout, parseWorkers };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Divider = api;
 })(typeof self !== 'undefined' ? self : this);
   </script>
   <script>
 (function () {
-  const { divideBeds, parseLayout, parseWorkers, nextFlags, workerRatio, nextWorkerExtras } = window.Divider;
+  const { divideBeds, parseLayout, parseWorkers, nextFlags, workerRatio, nextWorkerExtras, normalizeSex, clampMultiplier, cleanConflictList } = window.Divider;
   const STORE = 'bed-divider:v6';
   // Address of the Cloudflare Worker that stores the shared layout and bed
   // states (see worker/README.md). Leave empty to keep everything on this
@@ -652,31 +863,31 @@ textarea, input[type=text], input[type=number] {
   const FALLBACK_LAYOUT = { rooms: [{ room: "1", beds: ["A", "B", "C"] }, { room: "2", beds: ["A", "B", "C"] }, { room: "3", beds: ["A", "B"] }, { room: "4", beds: ["A", "B"] }, { room: "5", beds: ["A", "B", "C"] }, { room: "6", beds: ["A", "B"] }, { room: "7", beds: ["A", "B"] }, { room: "8", beds: ["A", "B", "C"] }, { room: "9", beds: ["A", "B"] }, { room: "10", beds: ["A", "B", "C"] }, { room: "11", beds: ["A", "B"] }, { room: "12", beds: ["A", "B", "C"] }, { room: "14", beds: ["A", "B", "C"] }, { room: "15", beds: ["A", "B"] }, { room: "16", beds: ["A", "B"] }, { room: "17", beds: ["A", "B"] }, { room: "18", beds: ["A", "B", "C"] }, { room: "19", beds: ["A", "B", "C"] }, { room: "20", beds: ["A", "B", "C"] }, { room: "21", beds: ["A", "B", "C"] }, { room: "22", beds: ["A", "B"] }, { room: "23", beds: ["A", "B"] }, { room: "24", beds: ["A", "B"] }, { room: "25", beds: ["A", "B"] }, { room: "26", beds: ["A", "B", "C"] }, { room: "27", beds: ["A", "B", "C"] }, { room: "28", beds: ["A", "B", "C"] }, { room: "29", beds: ["A", "B", "C"] }, { room: "30", beds: ["A", "B", "C"] }, { room: "31", beds: ["A", "B", "C"] }, { room: "32", beds: ["A", "B", "C"] }, { room: "33", beds: ["A", "B"] }, { room: "34", beds: ["A", "B", "C"] }, { room: "35", beds: ["A", "B"] }, { room: "36", beds: ["A", "B", "C"] }, { room: "37", beds: ["A", "B", "C"] }, { room: "38", beds: ["A", "B", "C"] }] };
   const FALLBACK_WORKERS = {
     AM: [
-      { id: "am-cecile", name: "Cecile" }, { id: "am-daniel", name: "Daniel" }, { id: "am-doris", name: "Doris" },
-      { id: "am-eduardo", name: "Eduardo" }, { id: "am-erma", name: "Erma" }, { id: "am-genet", name: "Genet" },
-      { id: "am-hiwot", name: "Hiwot" }, { id: "am-james", name: "James" }, { id: "am-jeanette", name: "Jeanette" },
-      { id: "am-jeanpaul", name: "Jeanpaul" }, { id: "am-mischelle", name: "Mischelle" }, { id: "am-nataly", name: "Nataly" },
-      { id: "am-obiamaka", name: "Obiamaka" }, { id: "am-prisca", name: "Prisca" }, { id: "am-sergio", name: "Sergio" },
-      { id: "am-sewalem", name: "Sewalem" }, { id: "am-shirley", name: "Shirley" }, { id: "am-tara", name: "Tara" },
-      { id: "am-tj", name: "TJ" }, { id: "am-victoria", name: "Victoria" }, { id: "am-wendell", name: "Wendell" },
+      { id: "am-cecile", name: "Cecile", sex: "F" }, { id: "am-daniel", name: "Daniel", sex: "F" }, { id: "am-doris", name: "Doris", sex: "F" },
+      { id: "am-eduardo", name: "Eduardo", sex: "F" }, { id: "am-erma", name: "Erma", sex: "F" }, { id: "am-genet", name: "Genet", sex: "F" },
+      { id: "am-hiwot", name: "Hiwot", sex: "F" }, { id: "am-james", name: "James", sex: "F" }, { id: "am-jeanette", name: "Jeanette", sex: "F" },
+      { id: "am-jeanpaul", name: "Jeanpaul", sex: "F" }, { id: "am-mischelle", name: "Mischelle", sex: "F" }, { id: "am-nataly", name: "Nataly", sex: "F" },
+      { id: "am-obiamaka", name: "Obiamaka", sex: "F" }, { id: "am-prisca", name: "Prisca", sex: "F" }, { id: "am-sergio", name: "Sergio", sex: "F" },
+      { id: "am-sewalem", name: "Sewalem", sex: "F" }, { id: "am-shirley", name: "Shirley", sex: "F" }, { id: "am-tara", name: "Tara", sex: "F" },
+      { id: "am-tj", name: "TJ", sex: "F" }, { id: "am-victoria", name: "Victoria", sex: "F" }, { id: "am-wendell", name: "Wendell", sex: "F" },
     ],
     PM: [
-      { id: "pm-alice", name: "Alice" }, { id: "pm-ariel", name: "Ariel" }, { id: "pm-cristina-d", name: "Cristina D" },
-      { id: "pm-finta", name: "Finta" }, { id: "pm-grace", name: "Grace" }, { id: "pm-kafilat", name: "Kafilat" },
-      { id: "pm-luan", name: "Luan" }, { id: "pm-nnenna", name: "Nnenna" }, { id: "pm-qing", name: "Qing" },
-      { id: "pm-rita", name: "Rita" }, { id: "pm-veronica", name: "Veronica" },
+      { id: "pm-alice", name: "Alice", sex: "F" }, { id: "pm-ariel", name: "Ariel", sex: "F" }, { id: "pm-cristina-d", name: "Cristina D", sex: "F" },
+      { id: "pm-finta", name: "Finta", sex: "F" }, { id: "pm-grace", name: "Grace", sex: "F" }, { id: "pm-kafilat", name: "Kafilat", sex: "F" },
+      { id: "pm-luan", name: "Luan", sex: "F" }, { id: "pm-nnenna", name: "Nnenna", sex: "F" }, { id: "pm-qing", name: "Qing", sex: "F" },
+      { id: "pm-rita", name: "Rita", sex: "F" }, { id: "pm-veronica", name: "Veronica", sex: "F" },
     ],
     NOC: [
-      { id: "noc-abiola", name: "Abiola" }, { id: "noc-amleset", name: "Amleset" }, { id: "noc-arlene", name: "Arlene" },
-      { id: "noc-barbara", name: "Barbara" }, { id: "noc-blessing", name: "Blessing" }, { id: "noc-elizabeth", name: "Elizabeth" },
-      { id: "noc-giscard", name: "Giscard" }, { id: "noc-jaylon", name: "Jaylon" }, { id: "noc-worknesh", name: "Worknesh" },
+      { id: "noc-abiola", name: "Abiola", sex: "F" }, { id: "noc-amleset", name: "Amleset", sex: "F" }, { id: "noc-arlene", name: "Arlene", sex: "F" },
+      { id: "noc-barbara", name: "Barbara", sex: "F" }, { id: "noc-blessing", name: "Blessing", sex: "F" }, { id: "noc-elizabeth", name: "Elizabeth", sex: "F" },
+      { id: "noc-giscard", name: "Giscard", sex: "F" }, { id: "noc-jaylon", name: "Jaylon", sex: "F" }, { id: "noc-worknesh", name: "Worknesh", sex: "F" },
     ],
     "On Call": [
-      { id: "oncall-amir", name: "Amir" }, { id: "oncall-animut", name: "Animut" }, { id: "oncall-annette", name: "Annette" },
-      { id: "oncall-cristina-p", name: "Cristina P" }, { id: "oncall-edgardo", name: "Edgardo" }, { id: "oncall-hossain", name: "Hossain" },
-      { id: "oncall-ifeoma", name: "Ifeoma" }, { id: "oncall-jose", name: "Jose" }, { id: "oncall-kala", name: "Kala" },
-      { id: "oncall-mulu", name: "Mulu" }, { id: "oncall-nataly", name: "Nataly" }, { id: "oncall-pramanik", name: "Pramanik" },
-      { id: "oncall-yeshimebet", name: "Yeshimebet" }, { id: "oncall-zailyah", name: "Zailyah" },
+      { id: "oncall-amir", name: "Amir", sex: "F" }, { id: "oncall-animut", name: "Animut", sex: "F" }, { id: "oncall-annette", name: "Annette", sex: "F" },
+      { id: "oncall-cristina-p", name: "Cristina P", sex: "F" }, { id: "oncall-edgardo", name: "Edgardo", sex: "F" }, { id: "oncall-hossain", name: "Hossain", sex: "F" },
+      { id: "oncall-ifeoma", name: "Ifeoma", sex: "F" }, { id: "oncall-jose", name: "Jose", sex: "F" }, { id: "oncall-kala", name: "Kala", sex: "F" },
+      { id: "oncall-mulu", name: "Mulu", sex: "F" }, { id: "oncall-nataly", name: "Nataly", sex: "F" }, { id: "oncall-pramanik", name: "Pramanik", sex: "F" },
+      { id: "oncall-yeshimebet", name: "Yeshimebet", sex: "F" }, { id: "oncall-zailyah", name: "Zailyah", sex: "F" },
     ],
   };
   const SHIFT_COLORS = { AM: '#f0c419', PM: '#f5891f', NOC: '#a855f7' };
@@ -695,17 +906,57 @@ textarea, input[type=text], input[type=number] {
     extras: [],
     finalizations: [],
   }]));
-  const defaults = () => ({ empty: {}, tab: 'AM', workers: allWorkers.map((w) => ({ ...w })), shifts: newShifts() });
+  const defaults = () => ({ empty: {}, bedProps: {}, tab: 'AM', workers: allWorkers.map((w) => ({ ...w })), shifts: newShifts() });
 
   let state = load();
   let layout = parseLayout(FALLBACK_LAYOUT);
-  // Shared mode: the Worker's copy of which beds are empty, keyed by bed id.
-  let shared = { on: false, version: 0, empty: {}, workers: null, shifts: null };
+  // Shared mode: the Worker's copy of which beds are empty and bed rules, keyed by bed id.
+  let shared = { on: false, version: 0, empty: {}, bedProps: {}, workers: null, shifts: null };
   let editing = false;
   let openMenuSlot = -1;
+  let editingBed = null;
+  let pickingConflictBed = null;
   const pending = [];        // changes waiting to be sent to the Worker
   let flushTimer = null;
   let saving = false;
+
+  const bedPropsMap = () => (shared.on ? shared.bedProps : (state.bedProps || (state.bedProps = {})));
+  function normalizeBedProp(p) {
+    const src = (p && typeof p === 'object') ? p : {};
+    return {
+      multiplier: clampMultiplier(src.multiplier),
+      noMales: !!src.noMales,
+      noFemales: !!src.noFemales,
+      conflict: cleanConflictList(src.conflict),
+    };
+  }
+  function isDefaultBedProp(p) {
+    return p.multiplier === 1 && !p.noMales && !p.noFemales && !p.conflict.length;
+  }
+  function getBedProps(id) {
+    return normalizeBedProp(bedPropsMap()[id]);
+  }
+  function setBedProps(roomName, label, patch) {
+    const id = roomName + label;
+    const map = bedPropsMap();
+    const next = normalizeBedProp({ ...getBedProps(id), ...patch });
+    if (isDefaultBedProp(next)) delete map[id];
+    else map[id] = next;
+    state.bedProps = state.bedProps || {};
+    if (isDefaultBedProp(next)) delete state.bedProps[id];
+    else state.bedProps[id] = next;
+    if (shared.on) {
+      queue({
+        op: 'setBedProps',
+        room: roomName,
+        bed: label,
+        multiplier: next.multiplier,
+        noMales: next.noMales,
+        noFemales: next.noFemales,
+        conflict: next.conflict.slice(),
+      });
+    }
+  }
 
   function workerPool() {
     return (shared.on && Array.isArray(shared.workers) && shared.workers.length) ? shared.workers : state.workers;
@@ -715,6 +966,7 @@ textarea, input[type=text], input[type=number] {
     const savedStats = new Map(Array.isArray(savedList) ? savedList.map((w) => [w.id, {
       shiftsWorked: Math.max(0, Math.floor(Number(w.shiftsWorked) || 0)),
       extraCount: Math.max(0, Math.floor(Number(w.extraCount) || 0)),
+      sex: normalizeSex(w.sex),
     }]) : []);
     return baseList.map((w) => {
       const st = savedStats.get(w.id);
@@ -722,6 +974,7 @@ textarea, input[type=text], input[type=number] {
         id: w.id,
         name: w.name,
         shift: w.shift,
+        sex: normalizeSex(w.sex) || (st && st.sex) || 'F',
         shiftsWorked: st ? st.shiftsWorked : Math.max(0, Math.floor(Number(w.shiftsWorked) || 0)),
         extraCount: st ? st.extraCount : Math.max(0, Math.floor(Number(w.extraCount) || 0)),
       };
@@ -758,6 +1011,14 @@ textarea, input[type=text], input[type=number] {
       const s = JSON.parse(localStorage.getItem(STORE));
       if (s && typeof s === 'object') {
         const out = Object.assign(defaults(), s);
+        const cleanProps = {};
+        if (s.bedProps && typeof s.bedProps === 'object') {
+          for (const [k, v] of Object.entries(s.bedProps)) {
+            const np = normalizeBedProp(v);
+            if (!isDefaultBedProp(np)) cleanProps[k] = np;
+          }
+        }
+        out.bedProps = cleanProps;
         out.workers = mergeWorkers(allWorkers, s.workers);
         out.shifts = newShifts();
         for (const n of SHIFTS) {
@@ -821,7 +1082,17 @@ textarea, input[type=text], input[type=number] {
     name: r.name,
     beds: r.beds.map((label) => {
       const id = r.name + label;
-      return { id, label, occupied: !emptyMap()[id] };
+      const props = getBedProps(id);
+      return {
+        id,
+        label,
+        room: r.name,
+        occupied: !emptyMap()[id],
+        multiplier: props.multiplier,
+        noMales: props.noMales,
+        noFemales: props.noFemales,
+        conflict: props.conflict,
+      };
     }),
   }));
 
@@ -871,11 +1142,62 @@ textarea, input[type=text], input[type=number] {
     return e;
   }
 
+  function bedRuns(occIds, allBeds, owners, workerIdx) {
+    if (!occIds.length) return [];
+    const bedIdx = new Map(allBeds.map((b, idx) => [b.id, idx]));
+    const runs = [];
+    let startId = occIds[0];
+    let prevId = occIds[0];
+    let prevPos = bedIdx.get(prevId);
+    for (let k = 1; k < occIds.length; k++) {
+      const curId = occIds[k];
+      const curPos = bedIdx.get(curId);
+      let blockedByOther = false;
+      for (let p = prevPos + 1; p < curPos; p++) {
+        const mid = allBeds[p];
+        if (mid && mid.occupied && owners && owners[p] !== workerIdx) {
+          blockedByOther = true;
+          break;
+        }
+      }
+      if (blockedByOther) {
+        runs.push([startId, prevId]);
+        startId = curId;
+      }
+      prevId = curId;
+      prevPos = curPos;
+    }
+    runs.push([startId, prevId]);
+    return runs;
+  }
+
+  function bedMetaParts(b) {
+    const parts = [];
+    if (b.multiplier > 1) parts.push(`${b.multiplier}x`);
+    if (b.noMales) parts.push('NoM');
+    if (b.noFemales) parts.push('NoF');
+    if (b.conflict && b.conflict.length) parts.push(`${b.conflict.length}c`);
+    return parts;
+  }
+
   function update() {
     const rooms = buildRooms();
     const allBeds = rooms.flatMap((r) => r.beds);
-    // Split only the occupied beds, in order, regardless of room.
-    const { groups } = divideBeds(allBeds, workers(), extras());
+    const pool = workerPool();
+    const currentIds = assignedIds().slice(0, workers());
+    const activeWorkers = currentIds.map((id) => pool.find((w) => w.id === id) || { id, name: id, sex: 'F', shiftsWorked: 0, extraCount: 0 });
+    const { groups, loads, owners, unmet } = divideBeds(allBeds, workers(), { scores: extras(), workers: activeWorkers });
+
+    const warn = $('rule-warning');
+    if (warn) {
+      if (unmet && unmet.length) {
+        warn.hidden = false;
+        warn.textContent = `Could not satisfy all bed rules for ${unmet.map((u) => u.bedId).join(', ')} with the workers currently on shift.`;
+      } else {
+        warn.hidden = true;
+        warn.textContent = '';
+      }
+    }
 
     // Room grid
     grid.innerHTML = '';
@@ -891,10 +1213,26 @@ textarea, input[type=text], input[type=number] {
       for (const b of room.beds) {
         const btn = el('button', 'bed ' + (b.occupied ? 'occupied' : 'empty'));
         btn.type = 'button';
-        btn.setAttribute('aria-pressed', String(b.occupied));
-        btn.setAttribute('aria-label', `Room ${room.name} bed ${b.label}, ${b.occupied ? 'occupied' : 'empty'}`);
-        btn.textContent = b.label;
-        btn.addEventListener('click', () => {
+        const meta = bedMetaParts(b);
+        btn.setAttribute('aria-pressed', editing ? String(meta.length > 0) : String(b.occupied));
+        const desc = [
+          `Room ${room.name} bed ${b.label}`,
+          editing ? 'edit rules' : (b.occupied ? 'occupied' : 'empty'),
+          ...meta,
+        ].join(', ');
+        btn.setAttribute('aria-label', desc);
+        btn.append(el('span', null, b.label));
+        if (meta.length) btn.append(el('span', 'bed-meta', meta.join(' ')));
+        btn.addEventListener('click', (e) => {
+          if (editing) {
+            e.stopPropagation();
+            closeToolsMenu();
+            openMenuSlot = -1;
+            pickingConflictBed = null;
+            editingBed = { room: room.name, label: b.label, id: b.id };
+            update();
+            return;
+          }
           const map = emptyMap();
           if (map[b.id]) delete map[b.id]; else map[b.id] = true;
           if (shared.on) queue({ op: 'setOccupied', room: room.name, bed: b.label, occupied: !map[b.id] });
@@ -940,10 +1278,9 @@ textarea, input[type=text], input[type=number] {
 
     // Assignment list: one line per worker with their bed range.
     const bedOrder = allBeds.map((x) => x.id);
-    lastCounts = groups.map((g) => g.occupied.length);
+    const bedIndexMap = new Map(allBeds.map((x, idx) => [x.id, idx]));
+    lastCounts = (loads && loads.length === groups.length) ? loads.slice() : groups.map((g) => g.occupied.length);
     results.innerHTML = '';
-    const pool = workerPool();
-    const currentIds = assignedIds().slice(0, workers());
     const shiftOrder = [tab(), ...SHIFTS.filter((s) => s !== tab()), 'On Call'];
 
     const shiftColor = SHIFT_COLORS[tab()] || SHIFT_COLORS.AM;
@@ -962,6 +1299,8 @@ textarea, input[type=text], input[type=number] {
       pick.addEventListener('click', (e) => {
         e.stopPropagation();
         closeToolsMenu();
+        editingBed = null;
+        pickingConflictBed = null;
         openMenuSlot = openMenuSlot === i ? -1 : i;
         update();
         if (openMenuSlot >= 0) $('worker-modal-body').scrollTop = 0;
@@ -976,28 +1315,126 @@ textarea, input[type=text], input[type=number] {
       if (!occ.length) {
         leftCol.append(el('p', 'range', 'No patients'));
       } else {
-        const first = occ[0], last = occ[occ.length - 1];
-        leftCol.append(el('p', 'range', first === last ? `Bed ${first}` : `Beds ${first} – ${last}`));
-        const a = bedOrder.indexOf(first), b = bedOrder.indexOf(last);
-        const skipped = bedOrder.slice(a, b + 1).filter((id) => !occ.includes(id));
+        const runs = bedRuns(occ, allBeds, owners, i);
+        const rangeText = runs.length === 1
+          ? (runs[0][0] === runs[0][1] ? `Bed ${runs[0][0]}` : `Beds ${runs[0][0]} – ${runs[0][1]}`)
+          : `Beds ${runs.map(([a, b]) => (a === b ? a : `${a} – ${b}`)).join(', ')}`;
+        leftCol.append(el('p', 'range', rangeText));
+        const skipped = [];
+        for (const [rs, re] of runs) {
+          const a = bedIndexMap.get(rs), b = bedIndexMap.get(re);
+          if (a == null || b == null) continue;
+          for (let p = a; p <= b; p++) {
+            if (!allBeds[p].occupied) skipped.push(bedOrder[p]);
+          }
+        }
         if (skipped.length) leftCol.append(el('p', 'open', `Skip (empty): ${skipped.join(', ')}`));
       }
 
+      const load = (loads && loads[i] != null) ? loads[i] : g.occupied.length;
+      const patientText = `${g.occupied.length} patient${g.occupied.length === 1 ? '' : 's'}`;
+      const countText = load !== g.occupied.length ? `${patientText} (${load} load)` : patientText;
       const rightMeta = el('div', 'right-meta');
       rightMeta.append(
         el('span', 'assign-num', `Assignment ${i + 1}`),
-        el('span', 'count', `${g.occupied.length} patient${g.occupied.length === 1 ? '' : 's'}`)
+        el('span', 'count', countText)
       );
 
       li.append(leftCol, rightMeta);
       results.append(li);
     });
 
-    renderPrintMap(rooms, groups);
+    renderPrintMap(rooms, groups, allBeds, loads, owners);
+
+    const bedModal = $('bed-modal');
+    const bedModalBody = $('bed-modal-body');
+    if (editing && editingBed && !pickingConflictBed) {
+      const { room: ebRoom, label: ebLabel, id: ebId } = editingBed;
+      const bp = getBedProps(ebId);
+      $('bed-modal-title').textContent = `Room ${ebRoom} · Bed ${ebLabel}`;
+      bedModalBody.innerHTML = '';
+
+      const addOpt = (titleText, active, subText, onClick) => {
+        const opt = el('button', 'bed-menu-opt');
+        opt.type = 'button';
+        opt.setAttribute('aria-pressed', String(!!active));
+        opt.append(el('span', null, titleText));
+        if (subText) opt.append(el('span', 'bed-menu-sub', subText));
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          onClick();
+        });
+        bedModalBody.append(opt);
+      };
+
+      addOpt('2x', bp.multiplier === 2, bp.multiplier === 2 ? 'Active' : '', () => {
+        setBedProps(ebRoom, ebLabel, { multiplier: bp.multiplier === 2 ? 1 : 2 });
+        update();
+      });
+      addOpt('3x', bp.multiplier === 3, bp.multiplier === 3 ? 'Active' : '', () => {
+        setBedProps(ebRoom, ebLabel, { multiplier: bp.multiplier === 3 ? 1 : 3 });
+        update();
+      });
+      addOpt('No males', bp.noMales, bp.noMales ? 'Restricted' : '', () => {
+        setBedProps(ebRoom, ebLabel, { noMales: !bp.noMales });
+        update();
+      });
+      addOpt('No females', bp.noFemales, bp.noFemales ? 'Restricted' : '', () => {
+        setBedProps(ebRoom, ebLabel, { noFemales: !bp.noFemales });
+        update();
+      });
+      const conflictNames = bp.conflict.map((cid) => {
+        const w = pool.find((x) => x.id === cid);
+        return w ? w.name : cid;
+      });
+      addOpt('Employee conflict', bp.conflict.length > 0, conflictNames.length ? conflictNames.join(', ') : 'None', () => {
+        pickingConflictBed = { ...editingBed };
+        update();
+        $('worker-modal-body').scrollTop = 0;
+      });
+      bedModal.hidden = false;
+    } else {
+      bedModal.hidden = true;
+      bedModalBody.innerHTML = '';
+    }
 
     const modal = $('worker-modal');
     const modalBody = $('worker-modal-body');
-    if (openMenuSlot >= 0 && openMenuSlot < groups.length) {
+    if (pickingConflictBed) {
+      const { room: cbRoom, label: cbLabel, id: cbId } = pickingConflictBed;
+      const bp = getBedProps(cbId);
+      const conflictSet = new Set(bp.conflict);
+      $('worker-modal-title').textContent = `Room ${cbRoom} Bed ${cbLabel} · Conflicts`;
+      modalBody.setAttribute('aria-label', `Employee conflicts for Room ${cbRoom} Bed ${cbLabel}`);
+      modalBody.innerHTML = '';
+      for (const shName of shiftOrder) {
+        const groupWorkers = pool
+          .filter((w) => w.shift === shName)
+          .slice()
+          .sort((a, b) => a.name.localeCompare(b.name));
+        if (!groupWorkers.length) continue;
+        modalBody.append(el('div', 'worker-group-label', shName));
+        for (const w of groupWorkers) {
+          const opt = el('button', 'worker-opt');
+          opt.type = 'button';
+          opt.setAttribute('role', 'option');
+          const selected = conflictSet.has(w.id);
+          opt.setAttribute('aria-selected', String(selected));
+          opt.append(el('span', null, w.name));
+          if (selected) opt.append(el('span', 'slot-note', 'Conflict'));
+          opt.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const cur = new Set(getBedProps(cbId).conflict);
+            if (cur.has(w.id)) cur.delete(w.id); else cur.add(w.id);
+            setBedProps(cbRoom, cbLabel, { conflict: [...cur] });
+            update();
+          });
+          modalBody.append(opt);
+        }
+      }
+      modal.hidden = false;
+      document.body.style.overflow = 'hidden';
+    } else if (openMenuSlot >= 0 && openMenuSlot < groups.length) {
       const i = openMenuSlot;
       $('worker-modal-title').textContent = `Assignment ${i + 1}`;
       modalBody.setAttribute('aria-label', `Assignment ${i + 1}`);
@@ -1029,7 +1466,7 @@ textarea, input[type=text], input[type=number] {
     } else {
       modal.hidden = true;
       modalBody.innerHTML = '';
-      document.body.style.overflow = '';
+      document.body.style.overflow = editingBed && editing ? 'hidden' : '';
     }
 
     const finList = (sharedShift() && Array.isArray(sharedShift().finalizations) && sharedShift().finalizations.length)
@@ -1098,6 +1535,7 @@ textarea, input[type=text], input[type=number] {
   }
   async function loadLayout() {
     if (location.protocol === 'file:') {
+      $('edit-toggle').hidden = false;
       showNote('Opened from a file, so the built-in room and worker lists are being used. On the website, they come from rooms.json and workers.json.');
       return;
     }
@@ -1150,14 +1588,24 @@ textarea, input[type=text], input[type=number] {
   function applyShared(saved) {
     layout = parseLayout({ rooms: saved.rooms.map((r) => ({ room: r.room, beds: r.beds.map((b) => b.label) })) });
     const empty = {};
-    saved.rooms.forEach((r) => r.beds.forEach((b) => { if (!b.occupied) empty[r.room + b.label] = true; }));
+    const bedProps = {};
+    saved.rooms.forEach((r) => r.beds.forEach((b) => {
+      const id = r.room + b.label;
+      if (!b.occupied) empty[id] = true;
+      const np = normalizeBedProp(b);
+      if (!isDefaultBedProp(np)) bedProps[id] = np;
+    }));
     shared.empty = empty;
+    shared.bedProps = bedProps;
+    state.bedProps = JSON.parse(JSON.stringify(bedProps));
     shared.version = saved.version || 0;
     if (Array.isArray(saved.workers) && saved.workers.length) {
+      const localSex = new Map(allWorkers.map((w) => [w.id, normalizeSex(w.sex)]));
       allWorkers = saved.workers.map((w) => ({
         id: w.id,
         name: w.name,
         shift: w.shift,
+        sex: localSex.get(w.id) || normalizeSex(w.sex) || 'F',
         shiftsWorked: Math.max(0, Math.floor(Number(w.shiftsWorked) || 0)),
         extraCount: Math.max(0, Math.floor(Number(w.extraCount) || 0)),
       }));
@@ -1192,11 +1640,22 @@ textarea, input[type=text], input[type=number] {
   // every save so the very first save can start from rooms.json and workers.json.
   function currentState() {
     return {
-      rooms: buildRooms().map((r) => ({ room: r.name, beds: r.beds.map((b) => ({ label: b.label, occupied: b.occupied })) })),
+      rooms: buildRooms().map((r) => ({
+        room: r.name,
+        beds: r.beds.map((b) => ({
+          label: b.label,
+          occupied: b.occupied,
+          multiplier: clampMultiplier(b.multiplier),
+          noMales: !!b.noMales,
+          noFemales: !!b.noFemales,
+          conflict: cleanConflictList(b.conflict),
+        })),
+      })),
       workers: workerPool().map((w) => ({
         id: w.id,
         name: w.name,
         shift: w.shift,
+        sex: normalizeSex(w.sex) || 'F',
         shiftsWorked: Math.max(0, Math.floor(Number(w.shiftsWorked) || 0)),
         extraCount: Math.max(0, Math.floor(Number(w.extraCount) || 0)),
       })),
@@ -1247,6 +1706,9 @@ textarea, input[type=text], input[type=number] {
     // Coalesce repeated changes to the same bed or shift worker count during the 2s pause.
     if (op.op === 'setOccupied') {
       const prev = pending.findIndex((p) => p.op === 'setOccupied' && p.room === op.room && p.bed === op.bed);
+      if (prev !== -1) pending.splice(prev, 1);
+    } else if (op.op === 'setBedProps') {
+      const prev = pending.findIndex((p) => p.op === 'setBedProps' && p.room === op.room && p.bed === op.bed);
       if (prev !== -1) pending.splice(prev, 1);
     } else if (op.op === 'setWorkers') {
       const prev = pending.findIndex((p) => p.op === 'setWorkers' && p.shift === op.shift);
@@ -1331,14 +1793,19 @@ textarea, input[type=text], input[type=number] {
     } else {
       if (r.beds.length <= 1) return;
       const gone = r.beds.pop();
-      delete shared.empty[roomName + gone];
-      queue({ op: 'removeBed', room: roomName });
+      const goneId = roomName + gone;
+      delete emptyMap()[goneId];
+      delete bedPropsMap()[goneId];
+      if (state.bedProps) delete state.bedProps[goneId];
+      if (editingBed && editingBed.id === goneId) editingBed = null;
+      if (pickingConflictBed && pickingConflictBed.id === goneId) pickingConflictBed = null;
+      if (shared.on) queue({ op: 'removeBed', room: roomName });
     }
     update();
   }
 
   async function setEditing(on) {
-    if (on) {
+    if (on && shared.on) {
       const code = getCode(true);
       if (!code) return;
       try {
@@ -1350,6 +1817,10 @@ textarea, input[type=text], input[type=number] {
       }
     }
     editing = on;
+    if (!on) {
+      editingBed = null;
+      pickingConflictBed = null;
+    }
     $('edit-toggle').setAttribute('aria-pressed', String(on));
     $('edit-toggle').textContent = on ? 'Done' : 'Edit beds';
     $('edit-hint').hidden = !on;
@@ -1408,7 +1879,7 @@ textarea, input[type=text], input[type=number] {
         .filter((w) => w.shift === group)
         .slice()
         .sort((a, b) => a.name.localeCompare(b.name))
-        .map((w) => ({ id: w.id, name: w.name }));
+        .map((w) => ({ id: w.id, name: w.name, sex: w.sex || 'F' }));
     }
     const blob = new Blob([JSON.stringify(out, null, 2) + '\n'], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1464,19 +1935,36 @@ textarea, input[type=text], input[type=number] {
     importFileInput.value = '';
   });
 
+  $('bed-modal').querySelector('.bed-modal-card').addEventListener('click', (e) => e.stopPropagation());
+  $('bed-modal').addEventListener('click', () => {
+    editingBed = null;
+    update();
+  });
+  $('bed-modal-close').addEventListener('click', () => {
+    editingBed = null;
+    update();
+  });
   $('worker-modal').addEventListener('click', (e) => e.stopPropagation());
   $('worker-modal-close').addEventListener('click', () => {
-    openMenuSlot = -1;
+    if (pickingConflictBed) pickingConflictBed = null;
+    else openMenuSlot = -1;
     update();
   });
   document.addEventListener('click', () => {
     closeToolsMenu();
-    if (openMenuSlot !== -1) { openMenuSlot = -1; update(); }
+    if (pickingConflictBed || editingBed || openMenuSlot !== -1) {
+      pickingConflictBed = null;
+      editingBed = null;
+      openMenuSlot = -1;
+      update();
+    }
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeToolsMenu();
-      if (openMenuSlot !== -1) { openMenuSlot = -1; update(); }
+      if (pickingConflictBed) { pickingConflictBed = null; update(); }
+      else if (editingBed) { editingBed = null; update(); }
+      else if (openMenuSlot !== -1) { openMenuSlot = -1; update(); }
     }
   });
 
@@ -1497,46 +1985,96 @@ textarea, input[type=text], input[type=number] {
     return String(str).length * 5.6;
   }
 
-  function computePrintSplits(rooms, groups) {
+  function computePrintSplits(rooms, groups, allBeds, loads, owners) {
     const posById = new Map();
+    const flatById = new Map();
+    let flatCounter = 0;
     rooms.forEach((r, rIdx) => {
       r.beds.forEach((b, cIdx) => {
-        posById.set(b.id, { r: rIdx, c: cIdx });
+        posById.set(b.id, { r: rIdx, c: cIdx, flatIdx: flatCounter });
+        flatById.set(b.id, flatCounter);
+        flatCounter += 1;
       });
     });
-    const minCount = groups.length ? Math.min(...groups.map((g) => g.occupied.length)) : 0;
-    const anyExtra = groups.length > 1 && groups.some((g) => g.occupied.length > minCount);
+    const loadArr = (loads && loads.length === groups.length) ? loads : groups.map((g) => g.occupied.length);
+    const minLoad = loadArr.length ? Math.min(...loadArr) : 0;
+    const anyExtra = loadArr.length > 1 && loadArr.some((l) => l > minLoad);
+
+    const pickPrimaryRun = (runs, g) => {
+      if (!runs.length) {
+        const fallback = g.occupied.length ? g.occupied : g.empty;
+        return fallback.length ? [fallback[0], fallback[fallback.length - 1]] : null;
+      }
+      if (runs.length === 1) return runs[0];
+      let best = runs[0], bestCount = -1;
+      for (const [rs, re] of runs) {
+        const a = flatById.get(rs), b = flatById.get(re);
+        const cnt = g.occupied.filter((id) => {
+          const p = flatById.get(id);
+          return p >= a && p <= b;
+        }).length;
+        if (cnt > bestCount) { bestCount = cnt; best = [rs, re]; }
+      }
+      return best;
+    };
+
     const spans = groups.map((g, i) => {
+      const runs = bedRuns(g.occupied, allBeds, owners, i);
+      const primary = pickPrimaryRun(runs, g);
       const ids = g.occupied.length ? g.occupied : g.empty;
-      if (!ids.length) return null;
+      if (!primary && !ids.length) return null;
+      const pFirstId = primary ? primary[0] : ids[0];
+      const pLastId = primary ? primary[1] : ids[ids.length - 1];
       const st = workerStatsForId(staffId(i));
+      const load = loadArr[i] != null ? loadArr[i] : g.occupied.length;
+      const rangeTxt = runs.length
+        ? runs.map(([a, b]) => (a === b ? a : `${a}–${b}`)).join(', ')
+        : 'None';
       return {
         idx: i,
         name: staffName(i),
         count: g.occupied.length,
+        load,
         pct: st.pct,
-        hasExtra: anyExtra && g.occupied.length > minCount,
-        firstId: ids[0],
-        lastId: ids[ids.length - 1],
-        first: posById.get(ids[0]),
-        last: posById.get(ids[ids.length - 1]),
+        hasExtra: anyExtra && load > minLoad,
+        rangeTxt,
+        first: posById.get(pFirstId),
+        last: posById.get(pLastId),
       };
     }).filter(Boolean);
+
+    spans.sort((a, b) => a.first.flatIdx - b.first.flatIdx);
     const splits = [];
     for (let k = 0; k < spans.length - 1; k++) {
       const prev = spans[k].last;
       const next = spans[k + 1].first;
       if (!prev || !next) continue;
       if (prev.r === next.r) {
-        splits.push({ r: next.r, c: next.c, afterIdx: k });
+        splits.push({ r: next.r, c: next.c, flatIdx: next.flatIdx, afterIdx: k });
       } else {
-        splits.push({ r: next.r, c: 0, afterIdx: k });
+        splits.push({ r: next.r, c: 0, flatIdx: flatById.get(rooms[next.r].beds[0].id), afterIdx: k });
       }
     }
-    return { spans, splits };
+    const zoneForFlat = (flatIdx) => {
+      let z = 0;
+      for (const sp of splits) {
+        if (flatIdx >= sp.flatIdx) z += 1;
+      }
+      return spans[z] ? spans[z].idx : -1;
+    };
+    return { spans, splits, zoneForFlat };
   }
 
-  function renderPrintMap(rooms, groups) {
+  function bedBoxDisplay(b, flatIdx, zoneIdx, owners) {
+    const owner = owners ? owners[flatIdx] : -1;
+    const isOutlier = b.occupied && owner >= 0 && zoneIdx >= 0 && owner !== zoneIdx;
+    let txt = b.label;
+    if (b.multiplier > 1) txt += ` ${b.multiplier}x`;
+    if (isOutlier) txt += ` #${owner + 1}`;
+    return { txt, isOutlier, compact: b.multiplier > 1 || isOutlier };
+  }
+
+  function renderPrintMap(rooms, groups, allBeds, loads, owners) {
     const container = $('print-room-map');
     if (!container) return;
     const R = rooms.length || 1;
@@ -1551,11 +2089,12 @@ textarea, input[type=text], input[type=number] {
     const gridRightX = bedStartX + maxBeds * bedW + (maxBeds - 1) * bedGap + 8;
     const midY = (r) => topY + r * rowStep - gap / 2;
 
-    const { spans, splits } = computePrintSplits(rooms, groups);
+    const { spans, splits, zoneForFlat } = computePrintSplits(rooms, groups, allBeds, loads, owners);
     const out = [];
     out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}pt" height="${H}pt" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMin meet" font-family="system-ui, -apple-system, sans-serif">`);
 
     // Rooms and beds
+    let flatIdx = 0;
     rooms.forEach((room, r) => {
       const ry = topY + r * rowStep;
       out.push(`<text x="${gridLeftX + 18}" y="${(ry + boxH * 0.74).toFixed(1)}" text-anchor="middle" font-size="9.2" font-weight="700" fill="#000">${xmlEscape(room.name)}</text>`);
@@ -1563,12 +2102,18 @@ textarea, input[type=text], input[type=number] {
         const bx = bedStartX + c * (bedW + bedGap);
         const by = ry + 1.0;
         const bh = boxH - 2.0;
+        const disp = bedBoxDisplay(b, flatIdx, zoneForFlat(flatIdx), owners);
+        flatIdx += 1;
+        const fSize = disp.compact ? '6.8' : (b.occupied ? '9.0' : '8.6');
+        const textY = (ry + boxH * (disp.compact ? 0.70 : 0.74)).toFixed(1);
         if (b.occupied) {
-          out.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bedW.toFixed(1)}" height="${bh.toFixed(1)}" rx="2.2" fill="#dfe7f2" stroke="#111" stroke-width="1"/>`);
-          out.push(`<text x="${(bx + bedW / 2).toFixed(1)}" y="${(ry + boxH * 0.74).toFixed(1)}" text-anchor="middle" font-size="9.0" font-weight="700" fill="#000">${xmlEscape(b.label)}</text>`);
+          const fill = disp.isOutlier ? '#fde68a' : '#dfe7f2';
+          const stroke = disp.isOutlier ? '#b45309' : '#111';
+          out.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bedW.toFixed(1)}" height="${bh.toFixed(1)}" rx="2.2" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`);
+          out.push(`<text x="${(bx + bedW / 2).toFixed(1)}" y="${textY}" text-anchor="middle" font-size="${fSize}" font-weight="700" fill="#000">${xmlEscape(disp.txt)}</text>`);
         } else {
           out.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bedW.toFixed(1)}" height="${bh.toFixed(1)}" rx="2.2" fill="#fff" stroke="#888" stroke-width="0.85" stroke-dasharray="2.5,2"/>`);
-          out.push(`<text x="${(bx + bedW / 2).toFixed(1)}" y="${(ry + boxH * 0.74).toFixed(1)}" text-anchor="middle" font-size="8.6" font-weight="600" fill="#777">${xmlEscape(b.label)}</text>`);
+          out.push(`<text x="${(bx + bedW / 2).toFixed(1)}" y="${textY}" text-anchor="middle" font-size="${fSize}" font-weight="600" fill="#777">${xmlEscape(disp.txt)}</text>`);
         }
       });
     });
@@ -1614,8 +2159,8 @@ textarea, input[type=text], input[type=number] {
       out.push(`<path d="M ${bx} ${y1.toFixed(1)} L ${bx + 5} ${y1.toFixed(1)} L ${bx + 5} ${y2.toFixed(1)} L ${bx} ${y2.toFixed(1)}" fill="none" stroke="#111" stroke-width="1.3"/>`);
       const label = `#${sp.idx + 1} ${sp.name}`;
       const pillTxt = `extra ${Math.round(sp.pct)}%`;
-      const rangeTxt = sp.firstId === sp.lastId ? sp.firstId : `${sp.firstId}–${sp.lastId}`;
-      const assignTxt = `${rangeTxt} (${sp.count})`;
+      const countLbl = sp.load !== sp.count ? `${sp.count}, ${sp.load}wt` : `${sp.count}`;
+      const assignTxt = `${sp.rangeTxt} (${countLbl})`;
       const extraTxt = `extra patient • lowest percentage (${sp.pct.toFixed(2)}%)`;
       const labelW = measureTextW(label, '700 10.5px system-ui, -apple-system, sans-serif');
       const tx = bx + 12;
@@ -1685,7 +2230,10 @@ textarea, input[type=text], input[type=number] {
   function buildAssignmentsPdf() {
     const rooms = buildRooms();
     const allBeds = rooms.flatMap((r) => r.beds);
-    const { groups } = divideBeds(allBeds, workers(), extras());
+    const pool = workerPool();
+    const currentIds = assignedIds().slice(0, workers());
+    const activeWorkers = currentIds.map((id) => pool.find((w) => w.id === id) || { id, name: id, sex: 'F', shiftsWorked: 0, extraCount: 0 });
+    const { groups, loads, owners } = divideBeds(allBeds, workers(), { scores: extras(), workers: activeWorkers });
     const title = `${new Date().toLocaleDateString()} ${tab()} Assignments`;
     const cmds = [];
     const marginX = 65;
@@ -1709,6 +2257,9 @@ textarea, input[type=text], input[type=number] {
     const rowTopPdf = (r) => gridTop - r * rowStep;
     const midYPdf = (r) => rowTopPdf(r) + gap / 2;
 
+    const { spans, splits, zoneForFlat } = computePrintSplits(rooms, groups, allBeds, loads, owners);
+
+    let flatIdx = 0;
     rooms.forEach((room, r) => {
       const rTop = rowTopPdf(r);
       const rBot = rTop - boxH;
@@ -1717,17 +2268,25 @@ textarea, input[type=text], input[type=number] {
         const bx = bedStartX + c * (bedW + bedGap);
         const by = rBot + 1.1;
         const bh = boxH - 2.2;
+        const disp = bedBoxDisplay(b, flatIdx, zoneForFlat(flatIdx), owners);
+        flatIdx += 1;
+        const ptSize = disp.compact ? 6.8 : (b.occupied ? 9.2 : 8.8);
+        const fontSpec = `${b.occupied ? '700' : '600'} ${ptSize}px Helvetica, Arial, sans-serif`;
+        const tw = measureTextW(disp.txt, fontSpec);
+        const txPdf = bx + (bedW - tw) / 2;
+        const tyPdf = rBot + boxH * (disp.compact ? 0.31 : 0.27);
         if (b.occupied) {
-          cmds.push(`0.87 0.91 0.95 rg 0.1 0.1 0.1 RG 0.9 w [ ] 0 d ${bx.toFixed(1)} ${by.toFixed(1)} ${bedW.toFixed(1)} ${bh.toFixed(1)} re B`);
-          cmds.push(`0 0 0 rg BT /F2 9.2 Tf ${(bx + bedW / 2 - 3.3).toFixed(1)} ${(rBot + boxH * 0.27).toFixed(1)} Td (${pdfEscape(b.label)}) Tj ET`);
+          const fill = disp.isOutlier ? '0.99 0.90 0.54' : '0.87 0.91 0.95';
+          const stroke = disp.isOutlier ? '0.71 0.33 0.04' : '0.1 0.1 0.1';
+          cmds.push(`${fill} rg ${stroke} RG 0.9 w [ ] 0 d ${bx.toFixed(1)} ${by.toFixed(1)} ${bedW.toFixed(1)} ${bh.toFixed(1)} re B`);
+          cmds.push(`0 0 0 rg BT /F2 ${ptSize} Tf ${txPdf.toFixed(1)} ${tyPdf.toFixed(1)} Td (${pdfEscape(disp.txt)}) Tj ET`);
         } else {
           cmds.push(`1 1 1 rg 0.55 0.55 0.55 RG 0.7 w [2.5 2] 0 d ${bx.toFixed(1)} ${by.toFixed(1)} ${bedW.toFixed(1)} ${bh.toFixed(1)} re B`);
-          cmds.push(`0.45 0.45 0.45 rg BT /F1 8.8 Tf ${(bx + bedW / 2 - 3.0).toFixed(1)} ${(rBot + boxH * 0.27).toFixed(1)} Td (${pdfEscape(b.label)}) Tj ET`);
+          cmds.push(`0.45 0.45 0.45 rg BT /F1 ${ptSize} Tf ${txPdf.toFixed(1)} ${tyPdf.toFixed(1)} Td (${pdfEscape(disp.txt)}) Tj ET`);
         }
       });
     });
 
-    const { spans, splits } = computePrintSplits(rooms, groups);
     const boundaryY = [];
     for (const sp of splits) {
       const leftX = gridLeftX;
@@ -1756,8 +2315,8 @@ textarea, input[type=text], input[type=number] {
       cmds.push(`0.1 0.1 0.1 RG 1.2 w [ ] 0 d ${bx} ${y1.toFixed(1)} m ${bx + 5} ${y1.toFixed(1)} l ${bx + 5} ${y2.toFixed(1)} l ${bx} ${y2.toFixed(1)} l S`);
       const label = `#${sp.idx + 1} ${sp.name}`;
       const pillTxt = `extra ${Math.round(sp.pct)}%`;
-      const rangeTxt = sp.firstId === sp.lastId ? sp.firstId : `${sp.firstId}–${sp.lastId}`;
-      const assignTxt = `${rangeTxt} (${sp.count})`;
+      const countLbl = sp.load !== sp.count ? `${sp.count}, ${sp.load}wt` : `${sp.count}`;
+      const assignTxt = `${sp.rangeTxt} (${countLbl})`;
       const extraTxt = `extra patient • lowest percentage (${sp.pct.toFixed(2)}%)`;
       const labelW = measureTextW(label, '700 10.5px Helvetica, Arial, sans-serif');
       const tx = bx + 12;
