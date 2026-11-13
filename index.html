@@ -2077,15 +2077,17 @@ textarea, input[type=text], input[type=number] {
     if (!container) return;
     const R = rooms.length || 1;
     const maxBeds = Math.max(1, ...rooms.map((r) => r.beds.length));
-    const W = 468, H = 576;
-    const topY = 1, availH = H - topY - 2;
+    const W = 468, H = 582;
+    const topY = 5, availH = H - 10;
     const rowStep = availH / R;
     const boxH = Math.min(10.0, rowStep - 4.8);
     const gap = rowStep - boxH;
     const gridLeftX = 0;
     const bedStartX = 28, bedW = Math.floor((88 - (maxBeds - 1) * 8) / maxBeds), bedGap = 8;
     const gridRightX = bedStartX + maxBeds * bedW + (maxBeds - 1) * bedGap + 6;
+    const leftRailX = gridLeftX + 1, rightRailX = gridRightX;
     const midY = (r) => topY + r * rowStep - gap / 2;
+    const topFrameY = midY(0), botFrameY = midY(R);
 
     const { spans, splits, zoneForFlat } = computePrintSplits(rooms, groups, allBeds, loads, owners);
     const out = [];
@@ -2095,7 +2097,7 @@ textarea, input[type=text], input[type=number] {
     let flatIdx = 0;
     rooms.forEach((room, r) => {
       const ry = topY + r * rowStep;
-      out.push(`<text x="${gridLeftX + 12}" y="${(ry + boxH * 0.76).toFixed(1)}" text-anchor="middle" font-size="7.8" font-weight="700" fill="#000">${xmlEscape(room.name)}</text>`);
+      out.push(`<text x="${gridLeftX + 14}" y="${(ry + boxH * 0.76).toFixed(1)}" text-anchor="middle" font-size="7.8" font-weight="700" fill="#000">${xmlEscape(room.name)}</text>`);
       room.beds.forEach((b, c) => {
         const bx = bedStartX + c * (bedW + bedGap);
         const by = ry + 0.6;
@@ -2116,29 +2118,28 @@ textarea, input[type=text], input[type=number] {
       });
     });
 
-    // Division lines across the room grid
-    const boundaryY = [];
+    // Division lines across the room grid + outer frame enclosing assignment blocks
+    const rightEdgeY = [];
+    const divHalos = [], divLines = [];
     for (const sp of splits) {
-      const leftX = gridLeftX;
-      const rightX = gridRightX + 4;
       const yAbove = midY(sp.r);
       const yBelow = midY(sp.r + 1);
       let d;
       if (sp.c === 0) {
-        d = `M ${leftX} ${yAbove.toFixed(1)} L ${rightX} ${yAbove.toFixed(1)}`;
-        boundaryY.push(yAbove);
+        d = `M ${leftRailX} ${yAbove.toFixed(1)} L ${rightRailX} ${yAbove.toFixed(1)}`;
       } else {
         const sx = bedStartX + sp.c * (bedW + bedGap) - bedGap / 2;
-        d = `M ${leftX} ${yBelow.toFixed(1)} L ${sx.toFixed(1)} ${yBelow.toFixed(1)} L ${sx.toFixed(1)} ${yAbove.toFixed(1)} L ${rightX} ${yAbove.toFixed(1)}`;
-        boundaryY.push((yAbove + yBelow) / 2);
+        d = `M ${leftRailX} ${yBelow.toFixed(1)} L ${sx.toFixed(1)} ${yBelow.toFixed(1)} L ${sx.toFixed(1)} ${yAbove.toFixed(1)} L ${rightRailX} ${yAbove.toFixed(1)}`;
       }
-      out.push(`<path d="${d}" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>`);
-      out.push(`<path d="${d}" fill="none" stroke="#808080" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round"/>`);
+      rightEdgeY.push(yAbove);
+      divHalos.push(`<path d="${d}" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>`);
+      divLines.push(`<path d="${d}" fill="none" stroke="#808080" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round"/>`);
     }
+    out.push(...divHalos);
+    out.push(`<path d="M ${leftRailX} ${topFrameY.toFixed(1)} L ${rightRailX} ${topFrameY.toFixed(1)} L ${rightRailX} ${botFrameY.toFixed(1)} L ${leftRailX} ${botFrameY.toFixed(1)} Z" fill="none" stroke="#808080" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round"/>`);
+    out.push(...divLines);
 
-    // Staff brackets and labels vertically centered on each bracket
-    const gridTop = topY;
-    const gridBot = topY + (R - 1) * rowStep + boxH;
+    // Staff labels vertically centered beside each enclosed block
     const pushPill = (px, baseY, pillTxt) => {
       const tw = measureTextW(pillTxt, '600 5.6px system-ui, -apple-system, sans-serif');
       const pw = Math.max(22, tw + 5);
@@ -2149,13 +2150,9 @@ textarea, input[type=text], input[type=number] {
     };
     const numColW = Math.ceil(Math.max(10, ...spans.map((sp) => measureTextW(`${sp.idx + 1}. `, '700 9.0px system-ui, -apple-system, sans-serif'))));
     spans.forEach((sp, k) => {
-      const secTop = k === 0 ? gridTop : boundaryY[k - 1];
-      const secBot = k === spans.length - 1 ? gridBot : boundaryY[k];
-      const y1 = secTop + 2;
-      const y2 = Math.max(y1 + 6, secBot - 2);
-      const ym = (y1 + y2) / 2;
-      const bx = gridRightX + 12;
-      out.push(`<path d="M ${bx} ${y1.toFixed(1)} L ${bx + 5} ${y1.toFixed(1)} L ${bx + 5} ${y2.toFixed(1)} L ${bx} ${y2.toFixed(1)}" fill="none" stroke="#111" stroke-width="1.0"/>`);
+      const secTop = k === 0 ? topFrameY : rightEdgeY[k - 1];
+      const secBot = k === spans.length - 1 ? botFrameY : rightEdgeY[k];
+      const ym = (secTop + secBot) / 2;
       const numTxt = `${sp.idx + 1}.`;
       const nameTxt = sp.name;
       const pillTxt = `extra ${Math.round(sp.pct)}%`;
@@ -2163,7 +2160,7 @@ textarea, input[type=text], input[type=number] {
       const assignTxt = `${sp.rangeTxt} (${countLbl})`;
       const extraTxt = `extra patient • lowest percentage (${sp.pct.toFixed(2)}%)`;
       const nameW = measureTextW(nameTxt, '700 9.0px system-ui, -apple-system, sans-serif');
-      const tx = bx + 12;
+      const tx = rightRailX + 10;
       const nameX = tx + numColW;
       if (sp.hasExtra) {
         const r1Y = ym - 6.0;
@@ -2246,8 +2243,10 @@ textarea, input[type=text], input[type=number] {
     const gridLeftX = marginX;
     const bedStartX = gridLeftX + 28, bedW = Math.floor((88 - (maxBeds - 1) * 8) / maxBeds), bedGap = 8;
     const gridRightX = bedStartX + maxBeds * bedW + (maxBeds - 1) * bedGap + 6;
+    const leftRailX = gridLeftX + 1, rightRailX = gridRightX;
     const rowTopPdf = (r) => gridTop - r * rowStep;
     const midYPdf = (r) => rowTopPdf(r) + gap / 2;
+    const topFrameY = midYPdf(0), botFrameY = midYPdf(R);
 
     const { spans, splits, zoneForFlat } = computePrintSplits(rooms, groups, allBeds, loads, owners);
 
@@ -2255,7 +2254,7 @@ textarea, input[type=text], input[type=number] {
     rooms.forEach((room, r) => {
       const rTop = rowTopPdf(r);
       const rBot = rTop - boxH;
-      cmds.push(`0 0 0 rg BT /F2 7.8 Tf ${(gridLeftX + 8).toFixed(1)} ${(rBot + boxH * 0.24).toFixed(1)} Td (${pdfEscape(room.name)}) Tj ET`);
+      cmds.push(`0 0 0 rg BT /F2 7.8 Tf ${(gridLeftX + 10).toFixed(1)} ${(rBot + boxH * 0.24).toFixed(1)} Td (${pdfEscape(room.name)}) Tj ET`);
       room.beds.forEach((b, c) => {
         const bx = bedStartX + c * (bedW + bedGap);
         const by = rBot + 0.8;
@@ -2279,33 +2278,26 @@ textarea, input[type=text], input[type=number] {
       });
     });
 
-    const boundaryY = [];
+    cmds.push(`0.5 0.5 0.5 RG 2.0 w [ ] 0 d 1 j 1 J ${leftRailX.toFixed(1)} ${botFrameY.toFixed(1)} ${(rightRailX - leftRailX).toFixed(1)} ${(topFrameY - botFrameY).toFixed(1)} re S`);
+    const rightEdgeY = [];
     for (const sp of splits) {
-      const leftX = gridLeftX;
-      const rightX = gridRightX + 4;
       const yAbove = midYPdf(sp.r);
       const yBelow = midYPdf(sp.r + 1);
-      cmds.push(`0.5 0.5 0.5 RG 2.0 w [ ] 0 d 1 j`);
+      cmds.push(`0.5 0.5 0.5 RG 2.0 w [ ] 0 d 1 j 1 J`);
       if (sp.c === 0) {
-        cmds.push(`${leftX} ${yAbove.toFixed(1)} m ${rightX} ${yAbove.toFixed(1)} l S`);
-        boundaryY.push(yAbove);
+        cmds.push(`${leftRailX} ${yAbove.toFixed(1)} m ${rightRailX} ${yAbove.toFixed(1)} l S`);
       } else {
         const sx = bedStartX + sp.c * (bedW + bedGap) - bedGap / 2;
-        cmds.push(`${leftX} ${yBelow.toFixed(1)} m ${sx.toFixed(1)} ${yBelow.toFixed(1)} l ${sx.toFixed(1)} ${yAbove.toFixed(1)} l ${rightX} ${yAbove.toFixed(1)} l S`);
-        boundaryY.push((yAbove + yBelow) / 2);
+        cmds.push(`${leftRailX} ${yBelow.toFixed(1)} m ${sx.toFixed(1)} ${yBelow.toFixed(1)} l ${sx.toFixed(1)} ${yAbove.toFixed(1)} l ${rightRailX} ${yAbove.toFixed(1)} l S`);
       }
+      rightEdgeY.push(yAbove);
     }
 
-    const lowestBot = rowTopPdf(R - 1) - boxH;
     const numColW = Math.ceil(Math.max(10, ...spans.map((sp) => measureTextW(`${sp.idx + 1}. `, '700 9.0px Helvetica, Arial, sans-serif'))));
     spans.forEach((sp, k) => {
-      const secTop = k === 0 ? gridTop : boundaryY[k - 1];
-      const secBot = k === spans.length - 1 ? lowestBot : boundaryY[k];
-      const y1 = secTop - 2;
-      const y2 = Math.min(y1 - 6, secBot + 2);
-      const ym = (y1 + y2) / 2;
-      const bx = gridRightX + 12;
-      cmds.push(`0.1 0.1 0.1 RG 1.0 w [ ] 0 d ${bx} ${y1.toFixed(1)} m ${bx + 5} ${y1.toFixed(1)} l ${bx + 5} ${y2.toFixed(1)} l ${bx} ${y2.toFixed(1)} l S`);
+      const secTop = k === 0 ? topFrameY : rightEdgeY[k - 1];
+      const secBot = k === spans.length - 1 ? botFrameY : rightEdgeY[k];
+      const ym = (secTop + secBot) / 2;
       const numTxt = `${sp.idx + 1}.`;
       const nameTxt = sp.name;
       const pillTxt = `extra ${Math.round(sp.pct)}%`;
@@ -2313,7 +2305,7 @@ textarea, input[type=text], input[type=number] {
       const assignTxt = `${sp.rangeTxt} (${countLbl})`;
       const extraTxt = `extra patient • lowest percentage (${sp.pct.toFixed(2)}%)`;
       const nameW = measureTextW(nameTxt, '700 9.0px Helvetica, Arial, sans-serif');
-      const tx = bx + 12;
+      const tx = rightRailX + 10;
       const nameX = tx + numColW;
       if (sp.hasExtra) {
         const r1Y = ym + 5.5;
