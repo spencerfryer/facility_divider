@@ -298,7 +298,7 @@ textarea, input[type=text], input[type=number] {
 @media print {
   :root { color-scheme: light; }
   html { background: #fff !important; margin: 0; padding: 0; height: auto !important; }
-  body { background: #fff !important; color: #000 !important; margin: 0; padding: 0.45in 1.9in 0.35in; height: auto !important; min-height: 0 !important; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { background: #fff !important; color: #000 !important; margin: 0; padding: 0.45in 1.4in 0.35in; height: auto !important; min-height: 0 !important; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .top, .row, .hint, .worker-menu, .worker-modal, .bed-modal, .rule-warning, .worker-pick .caret, .shift-dot, .tabs, #finalize-status, .finalizations, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type, #results { display: none !important; }
   main, .panel, #shift-panel, #print-shift, .print-body, #print-room-map, #print-stamp { break-after: avoid; page-break-after: avoid; }
   main { max-width: none; padding: 0; margin: 0; }
@@ -323,7 +323,7 @@ textarea, input[type=text], input[type=number] {
   #print-room-map svg {
     display: block;
     width: 100%;
-    max-width: 338pt;
+    max-width: 410pt;
     height: auto;
     max-height: 8.2in;
     margin: 0;
@@ -2075,7 +2075,7 @@ textarea, input[type=text], input[type=number] {
     if (!container) return;
     const R = rooms.length || 1;
     const maxBeds = Math.max(1, ...rooms.map((r) => r.beds.length));
-    const W = 338, H = 582;
+    const W = 410, H = 582;
     const topY = 4, availH = H - 8;
     const rowStep = availH / R;
     const boxH = Math.min(10.0, rowStep - 4.8);
@@ -2116,7 +2116,7 @@ textarea, input[type=text], input[type=number] {
       });
     });
 
-    // Division lines across the room grid + full 2pt enclosing grid borders
+    // Division lines across the room grid + full 1pt enclosing grid borders
     const roofRightX = W - 1;
     const rightEdgeY = [];
     const divHalos = [], divLines = [];
@@ -2133,12 +2133,12 @@ textarea, input[type=text], input[type=number] {
         dFull = `${dGrid} L ${roofRightX} ${yAbove.toFixed(1)}`;
       }
       rightEdgeY.push(yAbove);
-      divHalos.push(`<path d="${dGrid}" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>`);
-      divLines.push(`<path d="${dFull}" fill="none" stroke="#808080" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round"/>`);
+      divHalos.push(`<path d="${dGrid}" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`);
+      divLines.push(`<path d="${dFull}" fill="none" stroke="#808080" stroke-width="1.0" stroke-linecap="round" stroke-linejoin="round"/>`);
     }
     out.push(...divHalos);
-    out.push(`<path d="M ${leftRailX} ${topFrameY.toFixed(1)} L ${roofRightX} ${topFrameY.toFixed(1)} L ${roofRightX} ${botFrameY.toFixed(1)} L ${leftRailX} ${botFrameY.toFixed(1)} Z" fill="none" stroke="#808080" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round"/>`);
-    out.push(`<line x1="${rightRailX}" y1="${topFrameY.toFixed(1)}" x2="${rightRailX}" y2="${botFrameY.toFixed(1)}" stroke="#808080" stroke-width="2.0" stroke-linecap="round"/>`);
+    out.push(`<path d="M ${leftRailX} ${topFrameY.toFixed(1)} L ${roofRightX} ${topFrameY.toFixed(1)} L ${roofRightX} ${botFrameY.toFixed(1)} L ${leftRailX} ${botFrameY.toFixed(1)} Z" fill="none" stroke="#808080" stroke-width="1.0" stroke-linecap="round" stroke-linejoin="round"/>`);
+    out.push(`<line x1="${rightRailX}" y1="${topFrameY.toFixed(1)}" x2="${rightRailX}" y2="${botFrameY.toFixed(1)}" stroke="#808080" stroke-width="1.0" stroke-linecap="round"/>`);
     out.push(...divLines);
 
     // Staff labels top-aligned in each enclosed cell with right-justified counts/extra stats
@@ -2223,11 +2223,11 @@ textarea, input[type=text], input[type=number] {
     const { groups, loads, owners } = divideBeds(allBeds, workers(), { scores: extras(), workers: activeWorkers });
     const title = `${new Date().toLocaleDateString()} ${tab()} Assignments`;
     const cmds = [];
-    const marginX = 137;
+    const marginX = 101;
     const topLineY = 754;
     cmds.push(`0 0 0 rg BT /F2 12 Tf ${marginX} ${topLineY} Td (${pdfEscape(title)}) Tj ET`);
 
-    // Left-aligned visual room grid + full 2pt enclosed cells on US Letter (612x792pt)
+    // Left-aligned visual room grid + full 1pt enclosed cells on US Letter (612x792pt)
     const R = rooms.length || 1;
     const maxBeds = Math.max(1, ...rooms.map((r) => r.beds.length));
     const gridTop = topLineY - 14;
@@ -2275,13 +2275,13 @@ textarea, input[type=text], input[type=number] {
     });
 
     const roofRightX = 612 - marginX;
-    cmds.push(`0.5 0.5 0.5 RG 2.0 w [ ] 0 d 1 j 1 J ${leftRailX.toFixed(1)} ${botFrameY.toFixed(1)} ${(roofRightX - leftRailX).toFixed(1)} ${(topFrameY - botFrameY).toFixed(1)} re S`);
-    cmds.push(`0.5 0.5 0.5 RG 2.0 w [ ] 0 d 1 j 1 J ${rightRailX.toFixed(1)} ${botFrameY.toFixed(1)} m ${rightRailX.toFixed(1)} ${topFrameY.toFixed(1)} l S`);
+    cmds.push(`0.5 0.5 0.5 RG 1.0 w [ ] 0 d 1 j 1 J ${leftRailX.toFixed(1)} ${botFrameY.toFixed(1)} ${(roofRightX - leftRailX).toFixed(1)} ${(topFrameY - botFrameY).toFixed(1)} re S`);
+    cmds.push(`0.5 0.5 0.5 RG 1.0 w [ ] 0 d 1 j 1 J ${rightRailX.toFixed(1)} ${botFrameY.toFixed(1)} m ${rightRailX.toFixed(1)} ${topFrameY.toFixed(1)} l S`);
     const rightEdgeY = [];
     for (const sp of splits) {
       const yAbove = midYPdf(sp.r);
       const yBelow = midYPdf(sp.r + 1);
-      cmds.push(`0.5 0.5 0.5 RG 2.0 w [ ] 0 d 1 j 1 J`);
+      cmds.push(`0.5 0.5 0.5 RG 1.0 w [ ] 0 d 1 j 1 J`);
       if (sp.c === 0) {
         cmds.push(`${leftRailX} ${yAbove.toFixed(1)} m ${roofRightX} ${yAbove.toFixed(1)} l S`);
       } else {
