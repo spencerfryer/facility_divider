@@ -2162,28 +2162,17 @@ textarea, input[type=text], input[type=number] {
       const extraTxt = `extra patient • lowest percentage (${sp.pct.toFixed(2)}%)`;
       const labelW = measureTextW(label, '700 10.5px system-ui, -apple-system, sans-serif');
       const tx = bx + 12;
-      if (sp.hasExtra && y2 - y1 >= 34) {
+      if (sp.hasExtra) {
         const r1Y = ym - 7.5;
         out.push(`<text x="${tx}" y="${r1Y.toFixed(1)}" font-size="10.5" font-weight="700" fill="#000">${xmlEscape(label)}</text>`);
         pushPill(tx + labelW + 5, r1Y, pillTxt);
         out.push(`<text x="${tx}" y="${(ym + 5.0).toFixed(1)}" font-size="10.5" font-weight="600" fill="#444">${xmlEscape(assignTxt)}</text>`);
         out.push(`<text x="${tx}" y="${(ym + 16.0).toFixed(1)}" font-size="8.0" font-weight="500" fill="#666">${xmlEscape(extraTxt)}</text>`);
-      } else if (!sp.hasExtra && y2 - y1 >= 24) {
+      } else {
         const r1Y = ym - 2.0;
         out.push(`<text x="${tx}" y="${r1Y.toFixed(1)}" font-size="10.5" font-weight="700" fill="#000">${xmlEscape(label)}</text>`);
         pushPill(tx + labelW + 5, r1Y, pillTxt);
         out.push(`<text x="${tx}" y="${(ym + 11.0).toFixed(1)}" font-size="10.5" font-weight="600" fill="#444">${xmlEscape(assignTxt)}</text>`);
-      } else if (sp.hasExtra) {
-        const r1Y = ym - 2.0;
-        out.push(`<text x="${tx}" y="${r1Y.toFixed(1)}" font-size="10.5" font-weight="700" fill="#000">${xmlEscape(label)}</text>`);
-        const pw = pushPill(tx + labelW + 5, r1Y, pillTxt);
-        out.push(`<text x="${(tx + labelW + 5 + pw + 5).toFixed(1)}" y="${r1Y.toFixed(1)}" font-size="10.5" font-weight="600" fill="#444">${xmlEscape(assignTxt)}</text>`);
-        out.push(`<text x="${tx}" y="${(ym + 9.5).toFixed(1)}" font-size="8.0" font-weight="500" fill="#666">${xmlEscape(extraTxt)}</text>`);
-      } else {
-        const r1Y = ym + 3.6;
-        out.push(`<text x="${tx}" y="${r1Y.toFixed(1)}" font-size="10.5" font-weight="700" fill="#000">${xmlEscape(label)}</text>`);
-        const pw = pushPill(tx + labelW + 5, r1Y, pillTxt);
-        out.push(`<text x="${(tx + labelW + 5 + pw + 5).toFixed(1)}" y="${r1Y.toFixed(1)}" font-size="10.5" font-weight="600" fill="#444">${xmlEscape(assignTxt)}</text>`);
       }
     });
 
@@ -2318,28 +2307,17 @@ textarea, input[type=text], input[type=number] {
       const extraTxt = `extra patient • lowest percentage (${sp.pct.toFixed(2)}%)`;
       const labelW = measureTextW(label, '700 10.5px Helvetica, Arial, sans-serif');
       const tx = bx + 12;
-      if (sp.hasExtra && y1 - y2 >= 34) {
+      if (sp.hasExtra) {
         const r1Y = ym + 6.5;
         cmds.push(`0 0 0 rg BT /F2 10.5 Tf ${tx} ${r1Y.toFixed(1)} Td (${pdfEscape(label)}) Tj ET`);
         drawPdfPill(cmds, tx + labelW + 5, r1Y, pillTxt);
         cmds.push(`0.25 0.25 0.25 rg BT /F1 10.5 Tf ${tx} ${(ym - 5.5).toFixed(1)} Td (${pdfEscape(assignTxt)}) Tj ET`);
         cmds.push(`0.4 0.4 0.4 rg BT /F1 8.0 Tf ${tx} ${(ym - 16.0).toFixed(1)} Td (${pdfEscape(extraTxt)}) Tj ET`);
-      } else if (!sp.hasExtra && y1 - y2 >= 24) {
+      } else {
         const r1Y = ym + 2.5;
         cmds.push(`0 0 0 rg BT /F2 10.5 Tf ${tx} ${r1Y.toFixed(1)} Td (${pdfEscape(label)}) Tj ET`);
         drawPdfPill(cmds, tx + labelW + 5, r1Y, pillTxt);
         cmds.push(`0.25 0.25 0.25 rg BT /F1 10.5 Tf ${tx} ${(ym - 10.5).toFixed(1)} Td (${pdfEscape(assignTxt)}) Tj ET`);
-      } else if (sp.hasExtra) {
-        const r1Y = ym + 2.0;
-        cmds.push(`0 0 0 rg BT /F2 10.5 Tf ${tx} ${r1Y.toFixed(1)} Td (${pdfEscape(label)}) Tj ET`);
-        const pw = drawPdfPill(cmds, tx + labelW + 5, r1Y, pillTxt);
-        cmds.push(`0.25 0.25 0.25 rg BT /F1 10.5 Tf ${(tx + labelW + 5 + pw + 5).toFixed(1)} ${r1Y.toFixed(1)} Td (${pdfEscape(assignTxt)}) Tj ET`);
-        cmds.push(`0.4 0.4 0.4 rg BT /F1 8.0 Tf ${tx} ${(ym - 9.5).toFixed(1)} Td (${pdfEscape(extraTxt)}) Tj ET`);
-      } else {
-        const r1Y = ym - 3.6;
-        cmds.push(`0 0 0 rg BT /F2 10.5 Tf ${tx} ${r1Y.toFixed(1)} Td (${pdfEscape(label)}) Tj ET`);
-        const pw = drawPdfPill(cmds, tx + labelW + 5, r1Y, pillTxt);
-        cmds.push(`0.25 0.25 0.25 rg BT /F1 10.5 Tf ${(tx + labelW + 5 + pw + 5).toFixed(1)} ${r1Y.toFixed(1)} Td (${pdfEscape(assignTxt)}) Tj ET`);
       }
     });
 
