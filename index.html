@@ -264,9 +264,9 @@ textarea, input[type=text], input[type=number] {
 @media print {
   :root { color-scheme: light; }
   html { background: #fff !important; margin: 0; padding: 0; height: auto !important; }
-  body { background: #fff !important; color: #000 !important; margin: 0; padding: 0.5in 0.4in 0.25in; height: auto !important; min-height: 0 !important; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { background: #fff !important; color: #000 !important; margin: 0; padding: 0.45in 0.9in 0.35in; height: auto !important; min-height: 0 !important; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .top, .row, .hint, .worker-menu, .worker-modal, .worker-pick .caret, .shift-dot, .tabs, #finalize-status, .finalizations, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type, #results { display: none !important; }
-  main, .panel, #shift-panel, #print-shift, .print-body, #print-room-map { break-after: avoid; page-break-after: avoid; }
+  main, .panel, #shift-panel, #print-shift, .print-body, #print-room-map, #print-stamp { break-after: avoid; page-break-after: avoid; }
   main { max-width: none; padding: 0; margin: 0; }
   .panel { background: #fff !important; color: #000 !important; border: none; padding: 0; margin: 0; }
   .panel > h2 { display: none; }
@@ -277,7 +277,7 @@ textarea, input[type=text], input[type=number] {
     font-weight: 700;
     color: #000 !important;
     text-align: left;
-    margin: 0 0 6pt;
+    margin: 0 0 16pt;
     padding-bottom: 4pt;
     border-bottom: 1.5pt solid #000;
   }
@@ -290,20 +290,18 @@ textarea, input[type=text], input[type=number] {
   }
   #print-room-map svg {
     display: block;
-    width: 440pt;
+    width: 100%;
+    max-width: 468pt;
     height: auto;
-    max-width: 100%;
-    max-height: 8.0in;
+    max-height: 7.9in;
     margin: 0;
   }
   #print-stamp {
     display: block !important;
-    position: fixed;
-    left: 0.4in;
-    bottom: 0.35in;
-    margin: 0;
+    margin: 14pt 0 0;
     font-size: 8.5pt;
     line-height: 1.2;
+    text-align: left;
     color: #555 !important;
   }
   .tag { display: none !important; }
@@ -1495,19 +1493,19 @@ textarea, input[type=text], input[type=number] {
     if (!container) return;
     const R = rooms.length || 1;
     const maxBeds = Math.max(1, ...rooms.map((r) => r.beds.length));
-    const W = 440, H = 600;
-    const topY = 2, availH = H - topY - 2;
+    const W = 468, H = 568;
+    const topY = 1, availH = H - topY - 2;
     const rowStep = availH / R;
-    const boxH = Math.min(13.5, rowStep - 2.8);
+    const boxH = Math.min(13.2, rowStep - 2.8);
     const gap = rowStep - boxH;
-    const gridLeftX = 4;
-    const bedStartX = 40, bedW = Math.floor((156 - (maxBeds - 1) * 6) / maxBeds), bedGap = 6;
+    const gridLeftX = 0;
+    const bedStartX = 36, bedW = Math.floor((156 - (maxBeds - 1) * 6) / maxBeds), bedGap = 6;
     const gridRightX = bedStartX + maxBeds * bedW + (maxBeds - 1) * bedGap + 8;
     const midY = (r) => topY + r * rowStep - gap / 2;
 
     const { spans, splits } = computePrintSplits(rooms, groups);
     const out = [];
-    out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}pt" height="${H}pt" viewBox="0 0 ${W} ${H}" font-family="system-ui, -apple-system, sans-serif">`);
+    out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}pt" height="${H}pt" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMin meet" font-family="system-ui, -apple-system, sans-serif">`);
 
     // Rooms and beds
     rooms.forEach((room, r) => {
@@ -1531,7 +1529,7 @@ textarea, input[type=text], input[type=number] {
     // Division lines across the room grid
     const boundaryY = [];
     for (const sp of splits) {
-      const leftX = gridLeftX - 4;
+      const leftX = gridLeftX;
       const rightX = gridRightX + 4;
       const yAbove = midY(sp.r);
       const yBelow = midY(sp.r + 1);
@@ -1589,21 +1587,22 @@ textarea, input[type=text], input[type=number] {
     const { groups } = divideBeds(allBeds, workers(), extras());
     const title = `${new Date().toLocaleDateString()} ${tab()} Assignments`;
     const cmds = [];
+    const marginX = 65;
     let topLineY = 754;
-    cmds.push(`0 0 0 rg BT /F2 14 Tf 36 ${topLineY} Td (${pdfEscape(title)}) Tj ET`);
+    cmds.push(`0 0 0 rg BT /F2 14 Tf ${marginX} ${topLineY} Td (${pdfEscape(title)}) Tj ET`);
     topLineY -= 6;
-    cmds.push(`0 0 0 RG 1.2 w 36 ${topLineY} m 576 ${topLineY} l S`);
+    cmds.push(`0 0 0 RG 1.2 w ${marginX} ${topLineY} m ${612 - marginX} ${topLineY} l S`);
 
     // Left-aligned visual room grid + brackets + 10.5pt vertically centered labels on US Letter (612x792pt)
     const R = rooms.length || 1;
     const maxBeds = Math.max(1, ...rooms.map((r) => r.beds.length));
-    const gridTop = topLineY - 10;
+    const gridTop = topLineY - 18;
     const gridBot = 42;
     const availH = gridTop - gridBot;
     const rowStep = availH / R;
     const boxH = Math.min(15.2, rowStep - 3.0);
     const gap = rowStep - boxH;
-    const gridLeftX = 38;
+    const gridLeftX = marginX;
     const bedStartX = gridLeftX + 36, bedW = Math.floor((156 - (maxBeds - 1) * 6) / maxBeds), bedGap = 6;
     const gridRightX = bedStartX + maxBeds * bedW + (maxBeds - 1) * bedGap + 8;
     const rowTopPdf = (r) => gridTop - r * rowStep;
@@ -1631,7 +1630,7 @@ textarea, input[type=text], input[type=number] {
     const { spans, splits } = computePrintSplits(rooms, groups);
     const boundaryY = [];
     for (const sp of splits) {
-      const leftX = gridLeftX - 4;
+      const leftX = gridLeftX;
       const rightX = gridRightX + 4;
       const yAbove = midYPdf(sp.r);
       const yBelow = midYPdf(sp.r + 1);
@@ -1665,7 +1664,7 @@ textarea, input[type=text], input[type=number] {
       }
     });
 
-    cmds.push(`0.35 0.35 0.35 rg BT /F1 8.5 Tf 36 24 Td (${pdfEscape(formatPrintStamp())}) Tj ET`);
+    cmds.push(`0.35 0.35 0.35 rg BT /F1 8.5 Tf ${marginX} 24 Td (${pdfEscape(formatPrintStamp())}) Tj ET`);
 
     const stream = cmds.join('\n');
     const objs = [
