@@ -2165,7 +2165,6 @@ textarea, input[type=text], input[type=number] {
       const countLbl = sp.load !== sp.count ? `${sp.count}, ${sp.load}wt` : `${sp.count}`;
       const assignTxt = `${sp.rangeTxt} (${countLbl})`;
       const ptCountTxt = `${sp.count} ${sp.count === 1 ? 'patient' : 'patients'}`;
-      const extraRightTxt = `${sp.hasExtra ? 'extra • ' : ''}${sp.pct.toFixed(2)}% history`;
       const nameW = measureTextW(nameTxt, '700 8.5px system-ui, -apple-system, sans-serif');
       const tx = rightRailX + 7;
       const nameX = tx + numColW;
@@ -2175,7 +2174,10 @@ textarea, input[type=text], input[type=number] {
       pushPill(nameX + nameW + 4, r1Y, pillTxt);
       out.push(`<text x="${nameX}" y="${r2Y.toFixed(1)}" font-size="8.0" font-weight="600" fill="#444">${xmlEscape(assignTxt)}</text>`);
       out.push(`<text x="${rx}" y="${r1Y.toFixed(1)}" text-anchor="end" font-size="8.0" font-weight="700" fill="#111">${xmlEscape(ptCountTxt)}</text>`);
-      out.push(`<text x="${rx}" y="${r2Y.toFixed(1)}" text-anchor="end" font-size="6.1" font-weight="500" fill="#666">${xmlEscape(extraRightTxt)}</text>`);
+      if (sp.hasExtra) {
+        const extraRightTxt = `extra • ${sp.pct.toFixed(2)}% history`;
+        out.push(`<text x="${rx}" y="${r2Y.toFixed(1)}" text-anchor="end" font-size="6.1" font-weight="500" fill="#666">${xmlEscape(extraRightTxt)}</text>`);
+      }
     });
 
     out.push(`</svg>`);
@@ -2308,19 +2310,21 @@ textarea, input[type=text], input[type=number] {
       const countLbl = sp.load !== sp.count ? `${sp.count}, ${sp.load}wt` : `${sp.count}`;
       const assignTxt = `${sp.rangeTxt} (${countLbl})`;
       const ptCountTxt = `${sp.count} ${sp.count === 1 ? 'patient' : 'patients'}`;
-      const extraRightTxt = `${sp.hasExtra ? 'extra • ' : ''}${sp.pct.toFixed(2)}% history`;
       const nameW = measureTextW(nameTxt, '700 8.5px Helvetica, Arial, sans-serif');
       const tx = rightRailX + 7;
       const nameX = tx + numColW;
       const rx = roofRightX - 7;
       const ptCountW = measureTextW(ptCountTxt, '700 8.0px Helvetica, Arial, sans-serif');
-      const extraRightW = measureTextW(extraRightTxt, '500 6.1px Helvetica, Arial, sans-serif');
       cmds.push(`0 0 0 rg BT /F2 8.5 Tf ${tx} ${r1Y.toFixed(1)} Td (${pdfEscape(numTxt)}) Tj ET`);
       cmds.push(`0 0 0 rg BT /F2 8.5 Tf ${nameX} ${r1Y.toFixed(1)} Td (${pdfEscape(nameTxt)}) Tj ET`);
       drawPdfPill(cmds, nameX + nameW + 4, r1Y, pillTxt);
       cmds.push(`0.25 0.25 0.25 rg BT /F1 8.0 Tf ${nameX} ${r2Y.toFixed(1)} Td (${pdfEscape(assignTxt)}) Tj ET`);
       cmds.push(`0.07 0.07 0.07 rg BT /F2 8.0 Tf ${(rx - ptCountW).toFixed(1)} ${r1Y.toFixed(1)} Td (${pdfEscape(ptCountTxt)}) Tj ET`);
-      cmds.push(`0.4 0.4 0.4 rg BT /F1 6.1 Tf ${(rx - extraRightW).toFixed(1)} ${r2Y.toFixed(1)} Td (${pdfEscape(extraRightTxt)}) Tj ET`);
+      if (sp.hasExtra) {
+        const extraRightTxt = `extra • ${sp.pct.toFixed(2)}% history`;
+        const extraRightW = measureTextW(extraRightTxt, '500 6.1px Helvetica, Arial, sans-serif');
+        cmds.push(`0.4 0.4 0.4 rg BT /F1 6.1 Tf ${(rx - extraRightW).toFixed(1)} ${r2Y.toFixed(1)} Td (${pdfEscape(extraRightTxt)}) Tj ET`);
+      }
     });
 
     cmds.push(`0.35 0.35 0.35 rg BT /F1 7.5 Tf ${marginX} 24 Td (${pdfEscape(formatPrintStamp())}) Tj ET`);
