@@ -2165,7 +2165,7 @@ textarea, input[type=text], input[type=number] {
       const countLbl = sp.load !== sp.count ? `${sp.count}, ${sp.load}wt` : `${sp.count}`;
       const assignTxt = `${sp.rangeTxt} (${countLbl})`;
       const ptCountTxt = `${sp.count} ${sp.count === 1 ? 'patient' : 'patients'}`;
-      const extraRightTxt = `${sp.hasExtra ? 'extra patient • ' : ''}${Math.round(sp.pct)}% shifts with extra`;
+      const extraRightTxt = `${sp.hasExtra ? 'extra • ' : ''}${sp.pct.toFixed(2)}% history`;
       const nameW = measureTextW(nameTxt, '700 8.5px system-ui, -apple-system, sans-serif');
       const tx = rightRailX + 7;
       const nameX = tx + numColW;
@@ -2308,7 +2308,7 @@ textarea, input[type=text], input[type=number] {
       const countLbl = sp.load !== sp.count ? `${sp.count}, ${sp.load}wt` : `${sp.count}`;
       const assignTxt = `${sp.rangeTxt} (${countLbl})`;
       const ptCountTxt = `${sp.count} ${sp.count === 1 ? 'patient' : 'patients'}`;
-      const extraRightTxt = `${sp.hasExtra ? 'extra patient • ' : ''}${Math.round(sp.pct)}% shifts with extra`;
+      const extraRightTxt = `${sp.hasExtra ? 'extra • ' : ''}${sp.pct.toFixed(2)}% history`;
       const nameW = measureTextW(nameTxt, '700 8.5px Helvetica, Arial, sans-serif');
       const tx = rightRailX + 7;
       const nameX = tx + numColW;
