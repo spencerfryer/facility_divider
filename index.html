@@ -2138,6 +2138,12 @@ textarea, input[type=text], input[type=number] {
     out.push(...divHalos);
     out.push(`<path d="M ${leftRailX} ${topFrameY.toFixed(1)} L ${rightRailX} ${topFrameY.toFixed(1)} L ${rightRailX} ${botFrameY.toFixed(1)} L ${leftRailX} ${botFrameY.toFixed(1)} Z" fill="none" stroke="#808080" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round"/>`);
     out.push(...divLines);
+    const roofRightX = W - 1;
+    if (spans.length) {
+      for (const ry of [topFrameY, ...rightEdgeY]) {
+        out.push(`<line x1="${rightRailX}" y1="${ry.toFixed(1)}" x2="${roofRightX}" y2="${ry.toFixed(1)}" stroke="#808080" stroke-width="2.0" stroke-linecap="round"/>`);
+      }
+    }
 
     // Staff labels vertically centered beside each enclosed block
     const pushPill = (px, baseY, pillTxt) => {
@@ -2291,6 +2297,13 @@ textarea, input[type=text], input[type=number] {
         cmds.push(`${leftRailX} ${yBelow.toFixed(1)} m ${sx.toFixed(1)} ${yBelow.toFixed(1)} l ${sx.toFixed(1)} ${yAbove.toFixed(1)} l ${rightRailX} ${yAbove.toFixed(1)} l S`);
       }
       rightEdgeY.push(yAbove);
+    }
+    const roofRightX = 612 - marginX;
+    if (spans.length) {
+      cmds.push(`0.5 0.5 0.5 RG 2.0 w [ ] 0 d 1 J`);
+      for (const ry of [topFrameY, ...rightEdgeY]) {
+        cmds.push(`${rightRailX} ${ry.toFixed(1)} m ${roofRightX} ${ry.toFixed(1)} l S`);
+      }
     }
 
     const numColW = Math.ceil(Math.max(10, ...spans.map((sp) => measureTextW(`${sp.idx + 1}. `, '700 9.0px Helvetica, Arial, sans-serif'))));
