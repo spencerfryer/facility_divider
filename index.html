@@ -409,19 +409,27 @@ textarea, input[type=text], input[type=number] {
     return f;
   }
 
+  /** Current extra ratio (`extraCount / shiftsWorked`, or `0` if `shiftsWorked === 0`). */
+  function workerRatio(w) {
+    const sw = Math.max(0, Math.floor(Number(w && w.shiftsWorked) || 0));
+    const ec = Math.max(0, Math.floor(Number(w && w.extraCount) || 0));
+    return sw > 0 ? ec / sw : 0;
+  }
+
   /**
-   * Which of `n` workers get one of `extra` extra patients. Workers flagged
-   * as having already had an extra this round are skipped until everyone has
-   * had one; if there are more extras than unflagged workers, the rest go to
-   * flagged workers in order. With no flags, the first workers get them.
+   * Which of `n` workers get one of `extra` extra patients. Accepts either
+   * per-worker extra ratios (numbers, lowest gets extra first) or legacy
+   * boolean flags (`false` -> 0, `true` -> 1). Ties break by slot order.
    */
-  function pickExtras(extra, n, flags) {
-    let f = fitFlags(flags, n);
-    if (f.every(Boolean)) f = f.map(() => false);
-    const fresh = [], had = [];
-    f.forEach((x, i) => (x ? had : fresh).push(i));
-    const chosen = new Set(fresh.concat(had).slice(0, extra));
-    return f.map((_, i) => chosen.has(i));
+  function pickExtras(extra, n, scores) {
+    const vals = Array.from({ length: n }, (_, i) => {
+      const v = scores && scores[i];
+      return typeof v === 'number' && Number.isFinite(v) ? v : (v ? 1 : 0);
+    });
+    const order = Array.from({ length: n }, (_, i) => i)
+      .sort((a, b) => (Math.abs(vals[a] - vals[b]) < 1e-9 ? a - b : vals[a] - vals[b]));
+    const chosen = new Set(order.slice(0, Math.max(0, extra)));
+    return vals.map((_, i) => chosen.has(i));
   }
 
   /**
@@ -562,7 +570,7 @@ textarea, input[type=text], input[type=number] {
   /**
    * Read the worker lists from workers.json:
    *   { "AM": [{ "id": "am1", "name": "Alex" }, ...], "PM": [...], "NOC": [...], "On Call": [...] }
-   * Returns a flat list of `{ id, name, shift, extra }` alphabetized within each shift.
+   * Returns a flat list of `{ id, name, shift, shiftsWorked, extraCount }` alphabetized within each shift.
    */
   function parseWorkers(data) {
     if (!data || typeof data !== 'object') throw new Error('workers.json needs AM, PM and NOC worker lists.');
@@ -581,7 +589,9 @@ textarea, input[type=text], input[type=number] {
         if (!id) throw new Error(`${shift} worker "${name}" in workers.json has no "id".`);
         if (seenIds.has(id)) throw new Error(`Worker id "${id}" is listed twice in workers.json.`);
         seenIds.add(id);
-        return { id, name, shift, extra: !!(w && w.extra) };
+        const shiftsWorked = isStr ? 0 : Math.max(0, Math.floor(Number(w && w.shiftsWorked) || 0));
+        const extraCount = isStr ? 0 : Math.max(0, Math.floor(Number(w && w.extraCount) || 0));
+        return { id, name, shift, shiftsWorked, extraCount };
       });
       group.sort((a, b) => a.name.localeCompare(b.name));
       out.push(...group);
@@ -591,48 +601,45 @@ textarea, input[type=text], input[type=number] {
   }
 
   /**
-   * Updates per-worker `extra` status across the facility worker pool after a finalize.
-   * Workers can fill in from any shift and retain or lose their `extra` status.
+   * Updates per-worker `shiftsWorked` and `extraCount` across the facility worker pool after a finalize.
+   * Everyone assigned to the finalized shift gets `shiftsWorked + 1`, and workers above the
+   * fewest patients on the shift also get `extraCount + 1`.
    */
   function nextWorkerExtras(workers, shift, assignedIds, counts) {
     if (!Array.isArray(workers) || !workers.length) return [];
-    const out = workers.map((w) => ({ id: String(w.id), name: String(w.name), shift: w.shift, extra: !!w.extra }));
+    const out = workers.map((w) => ({
+      id: String(w.id),
+      name: String(w.name),
+      shift: w.shift,
+      shiftsWorked: Math.max(0, Math.floor(Number(w.shiftsWorked) || 0)),
+      extraCount: Math.max(0, Math.floor(Number(w.extraCount) || 0)),
+    }));
     const byId = new Map(out.map((w) => [w.id, w]));
     const ids = Array.isArray(assignedIds) ? assignedIds.slice(0, counts.length) : [];
-    const active = ids.map((id) => byId.get(id)).filter(Boolean);
-    if (active.length && active.every((w) => w.extra)) {
-      active.forEach((w) => { w.extra = false; });
-    }
-    const hadBefore = new Set(out.filter((w) => w.extra).map((w) => w.id));
-    const min = Math.min(...counts);
-    const gotSecond = new Set();
-    counts.forEach((c, i) => {
-      if (c > min) {
-        const w = byId.get(ids[i]);
-        if (w) {
-          if (hadBefore.has(w.id)) gotSecond.add(w.id);
-          w.extra = true;
-        }
-      }
+    const min = counts.length ? Math.min(...counts) : 0;
+    const worked = new Set();
+    const gotExtra = new Set();
+    ids.forEach((id, i) => {
+      const w = byId.get(id);
+      if (!w || worked.has(w.id)) return;
+      worked.add(w.id);
+      w.shiftsWorked += 1;
+      if (counts[i] > min) gotExtra.add(w.id);
     });
-    const shiftPool = out.filter((w) => w.shift === shift);
-    if (shiftPool.length && shiftPool.every((w) => w.extra)) {
-      shiftPool.forEach((w) => { w.extra = gotSecond.has(w.id); });
-    }
-    if (active.length && active.every((w) => w.extra)) {
-      active.forEach((w) => { w.extra = gotSecond.has(w.id); });
+    for (const id of gotExtra) {
+      byId.get(id).extraCount += 1;
     }
     return out;
   }
 
-  const api = { evenSizes, pickExtras, nextFlags, nextWorkerExtras, divideBeds, parseBedList, parseLayout, parseWorkers };
+  const api = { evenSizes, pickExtras, nextFlags, workerRatio, nextWorkerExtras, nextWorkerStats: nextWorkerExtras, divideBeds, parseBedList, parseLayout, parseWorkers };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Divider = api;
 })(typeof self !== 'undefined' ? self : this);
   </script>
   <script>
 (function () {
-  const { divideBeds, parseLayout, parseWorkers, nextFlags, nextWorkerExtras } = window.Divider;
+  const { divideBeds, parseLayout, parseWorkers, nextFlags, workerRatio, nextWorkerExtras } = window.Divider;
   const STORE = 'bed-divider:v6';
   // Address of the Cloudflare Worker that stores the shared layout and bed
   // states (see worker/README.md). Leave empty to keep everything on this
@@ -705,13 +712,20 @@ textarea, input[type=text], input[type=number] {
   }
 
   function mergeWorkers(baseList, savedList) {
-    const savedExtra = new Map(Array.isArray(savedList) ? savedList.map((w) => [w.id, !!w.extra]) : []);
-    return baseList.map((w) => ({
-      id: w.id,
-      name: w.name,
-      shift: w.shift,
-      extra: savedExtra.has(w.id) ? savedExtra.get(w.id) : !!w.extra,
-    }));
+    const savedStats = new Map(Array.isArray(savedList) ? savedList.map((w) => [w.id, {
+      shiftsWorked: Math.max(0, Math.floor(Number(w.shiftsWorked) || 0)),
+      extraCount: Math.max(0, Math.floor(Number(w.extraCount) || 0)),
+    }]) : []);
+    return baseList.map((w) => {
+      const st = savedStats.get(w.id);
+      return {
+        id: w.id,
+        name: w.name,
+        shift: w.shift,
+        shiftsWorked: st ? st.shiftsWorked : Math.max(0, Math.floor(Number(w.shiftsWorked) || 0)),
+        extraCount: st ? st.extraCount : Math.max(0, Math.floor(Number(w.extraCount) || 0)),
+      };
+    });
   }
 
   // Ensure each slot on the shift has a unique valid worker id from the facility pool.
@@ -788,11 +802,17 @@ textarea, input[type=text], input[type=number] {
     const found = workerPool().find((w) => w.id === id);
     return found ? found.name : `Worker ${i + 1}`;
   };
-  // Per-worker "had extra" booleans for the workers currently on shift.
+  const workerStatsForId = (id) => {
+    const w = workerPool().find((x) => x.id === id);
+    const shiftsWorked = Math.max(0, Math.floor(Number(w && w.shiftsWorked) || 0));
+    const extraCount = Math.max(0, Math.floor(Number(w && w.extraCount) || 0));
+    const ratio = workerRatio(w);
+    return { shiftsWorked, extraCount, ratio, pct: ratio * 100 };
+  };
+  // Per-worker current extra ratios for the workers currently on shift.
   const extras = () => {
-    const byId = new Map(workerPool().map((w) => [w.id, !!w.extra]));
     const ids = assignedIds();
-    return Array.from({ length: workers() }, (_, i) => !!byId.get(ids[i]));
+    return Array.from({ length: workers() }, (_, i) => workerStatsForId(ids[i]).ratio);
   };
   let lastCounts = [];
   // Bed ids look like "12A"; the label is the part after the room name.
@@ -924,7 +944,6 @@ textarea, input[type=text], input[type=number] {
     results.innerHTML = '';
     const pool = workerPool();
     const currentIds = assignedIds().slice(0, workers());
-    const activeFlags = extras().slice(0, workers());
     const shiftOrder = [tab(), ...SHIFTS.filter((s) => s !== tab()), 'On Call'];
 
     const shiftColor = SHIFT_COLORS[tab()] || SHIFT_COLORS.AM;
@@ -947,7 +966,10 @@ textarea, input[type=text], input[type=number] {
         update();
         if (openMenuSlot >= 0) $('worker-modal-body').scrollTop = 0;
       });
-      wrap.append(pick);
+      const st = workerStatsForId(staffId(i));
+      const tag = el('span', 'tag', `extra ${Math.round(st.pct)}%`);
+      tag.title = `${st.extraCount} extra${st.extraCount === 1 ? '' : 's'} in ${st.shiftsWorked} shift${st.shiftsWorked === 1 ? '' : 's'} (${st.pct.toFixed(2)}%)`;
+      wrap.append(pick, tag);
       leftCol.append(wrap);
 
       const occ = g.occupied;
@@ -966,11 +988,6 @@ textarea, input[type=text], input[type=number] {
         el('span', 'assign-num', `Assignment ${i + 1}`),
         el('span', 'count', `${g.occupied.length} patient${g.occupied.length === 1 ? '' : 's'}`)
       );
-      if (activeFlags[i]) {
-        const tag = el('span', 'tag', 'had extra');
-        tag.title = 'Got an extra patient earlier this round, so the next extras go to others first.';
-        rightMeta.append(tag);
-      }
 
       li.append(leftCol, rightMeta);
       results.append(li);
@@ -1040,7 +1057,7 @@ textarea, input[type=text], input[type=number] {
     const counts = lastCounts.slice();
     const shift = tab();
     const ids = Array.from({ length: counts.length }, (_, i) => staffId(i));
-    if (!confirm('Finalizing this list will record which workers have heavy assignments today and rotate any extra patients next time to maintain fairness. Are you sure this list is ready to record in the schedule book?')) return;
+    if (!confirm('Finalizing this list will increment shifts worked for everyone on this shift, record who received an extra patient, and use each worker\'s extra percentage next time to maintain fairness. Are you sure this list is ready to record in the schedule book?')) return;
     const at = new Date().toISOString();
     const prevWorkers = state.workers.map((w) => ({ ...w }));
     const prevExtras = state.shifts[shift].extras.slice();
@@ -1056,6 +1073,7 @@ textarea, input[type=text], input[type=number] {
       const ok = await flush();
       if (!ok) {
         state.workers = prevWorkers;
+        shared.workers = prevWorkers.map((w) => ({ ...w }));
         state.shifts[shift].extras = prevExtras;
         state.shifts[shift].finalizations = prevFin;
         sharedShift().finalizations = prevFin.slice();
@@ -1136,7 +1154,13 @@ textarea, input[type=text], input[type=number] {
     shared.empty = empty;
     shared.version = saved.version || 0;
     if (Array.isArray(saved.workers) && saved.workers.length) {
-      allWorkers = saved.workers.map((w) => ({ id: w.id, name: w.name, shift: w.shift, extra: !!w.extra }));
+      allWorkers = saved.workers.map((w) => ({
+        id: w.id,
+        name: w.name,
+        shift: w.shift,
+        shiftsWorked: Math.max(0, Math.floor(Number(w.shiftsWorked) || 0)),
+        extraCount: Math.max(0, Math.floor(Number(w.extraCount) || 0)),
+      }));
       shared.workers = allWorkers.map((w) => ({ ...w }));
       state.workers = allWorkers.map((w) => ({ ...w }));
     } else {
@@ -1169,7 +1193,13 @@ textarea, input[type=text], input[type=number] {
   function currentState() {
     return {
       rooms: buildRooms().map((r) => ({ room: r.name, beds: r.beds.map((b) => ({ label: b.label, occupied: b.occupied })) })),
-      workers: workerPool().map((w) => ({ id: w.id, name: w.name, shift: w.shift, extra: !!w.extra })),
+      workers: workerPool().map((w) => ({
+        id: w.id,
+        name: w.name,
+        shift: w.shift,
+        shiftsWorked: Math.max(0, Math.floor(Number(w.shiftsWorked) || 0)),
+        extraCount: Math.max(0, Math.floor(Number(w.extraCount) || 0)),
+      })),
       shifts: Object.fromEntries(SHIFTS.map((n) => [n, {
         workers: state.shifts[n].workers,
         ids: state.shifts[n].ids,
@@ -1454,6 +1484,19 @@ textarea, input[type=text], input[type=number] {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  let measureCtx = null;
+  function measureTextW(str, font) {
+    if (!measureCtx && typeof document !== 'undefined') {
+      const c = document.createElement('canvas');
+      measureCtx = c.getContext && c.getContext('2d');
+    }
+    if (measureCtx) {
+      measureCtx.font = font;
+      return measureCtx.measureText(str).width;
+    }
+    return String(str).length * 5.6;
+  }
+
   function computePrintSplits(rooms, groups) {
     const posById = new Map();
     rooms.forEach((r, rIdx) => {
@@ -1461,13 +1504,18 @@ textarea, input[type=text], input[type=number] {
         posById.set(b.id, { r: rIdx, c: cIdx });
       });
     });
+    const minCount = groups.length ? Math.min(...groups.map((g) => g.occupied.length)) : 0;
+    const anyExtra = groups.length > 1 && groups.some((g) => g.occupied.length > minCount);
     const spans = groups.map((g, i) => {
       const ids = g.occupied.length ? g.occupied : g.empty;
       if (!ids.length) return null;
+      const st = workerStatsForId(staffId(i));
       return {
         idx: i,
         name: staffName(i),
         count: g.occupied.length,
+        pct: st.pct,
+        hasExtra: anyExtra && g.occupied.length > minCount,
         firstId: ids[0],
         lastId: ids[ids.length - 1],
         first: posById.get(ids[0]),
@@ -1549,6 +1597,14 @@ textarea, input[type=text], input[type=number] {
     // Staff brackets and 10.5pt labels vertically centered on each bracket
     const gridTop = topY;
     const gridBot = topY + (R - 1) * rowStep + boxH;
+    const pushPill = (px, baseY, pillTxt) => {
+      const tw = measureTextW(pillTxt, '600 8px system-ui, -apple-system, sans-serif');
+      const pw = Math.max(36, tw + 10);
+      const ph = 12.2;
+      out.push(`<rect x="${px.toFixed(1)}" y="${(baseY - 9.6).toFixed(1)}" width="${pw.toFixed(1)}" height="${ph.toFixed(1)}" rx="${(ph / 2).toFixed(1)}" fill="#f2f4f7" stroke="#bbb" stroke-width="0.7"/>`);
+      out.push(`<text x="${(px + pw / 2).toFixed(1)}" y="${(baseY - 1.0).toFixed(1)}" text-anchor="middle" font-size="8.0" font-weight="600" fill="#333">${xmlEscape(pillTxt)}</text>`);
+      return pw;
+    };
     spans.forEach((sp, k) => {
       const secTop = k === 0 ? gridTop : boundaryY[k - 1];
       const secBot = k === spans.length - 1 ? gridBot : boundaryY[k];
@@ -1558,12 +1614,34 @@ textarea, input[type=text], input[type=number] {
       const bx = gridRightX + 10;
       out.push(`<path d="M ${bx} ${y1.toFixed(1)} L ${bx + 5} ${y1.toFixed(1)} L ${bx + 5} ${y2.toFixed(1)} L ${bx} ${y2.toFixed(1)}" fill="none" stroke="#111" stroke-width="1.3"/>`);
       const label = `#${sp.idx + 1} ${sp.name}`;
+      const pillTxt = `extra ${Math.round(sp.pct)}%`;
       const rangeTxt = sp.firstId === sp.lastId ? sp.firstId : `${sp.firstId}–${sp.lastId}`;
-      if (y2 - y1 >= 24) {
-        out.push(`<text x="${bx + 12}" y="${(ym - 2.0).toFixed(1)}" font-size="10.5" font-weight="700" fill="#000">${xmlEscape(label)}</text>`);
-        out.push(`<text x="${bx + 12}" y="${(ym + 11.0).toFixed(1)}" font-size="10.5" font-weight="600" fill="#444">${xmlEscape(rangeTxt)} (${sp.count})</text>`);
+      const assignTxt = `${rangeTxt} (${sp.count})`;
+      const extraTxt = `extra patient • lowest percentage (${sp.pct.toFixed(2)}%)`;
+      const labelW = measureTextW(label, '700 10.5px system-ui, -apple-system, sans-serif');
+      const tx = bx + 12;
+      if (sp.hasExtra && y2 - y1 >= 34) {
+        const r1Y = ym - 7.5;
+        out.push(`<text x="${tx}" y="${r1Y.toFixed(1)}" font-size="10.5" font-weight="700" fill="#000">${xmlEscape(label)}</text>`);
+        pushPill(tx + labelW + 6, r1Y, pillTxt);
+        out.push(`<text x="${tx}" y="${(ym + 5.0).toFixed(1)}" font-size="10.5" font-weight="600" fill="#444">${xmlEscape(assignTxt)}</text>`);
+        out.push(`<text x="${tx}" y="${(ym + 16.0).toFixed(1)}" font-size="8.0" font-weight="500" fill="#666">${xmlEscape(extraTxt)}</text>`);
+      } else if (!sp.hasExtra && y2 - y1 >= 24) {
+        const r1Y = ym - 2.0;
+        out.push(`<text x="${tx}" y="${r1Y.toFixed(1)}" font-size="10.5" font-weight="700" fill="#000">${xmlEscape(label)}</text>`);
+        pushPill(tx + labelW + 6, r1Y, pillTxt);
+        out.push(`<text x="${tx}" y="${(ym + 11.0).toFixed(1)}" font-size="10.5" font-weight="600" fill="#444">${xmlEscape(assignTxt)}</text>`);
+      } else if (sp.hasExtra) {
+        const r1Y = ym - 2.0;
+        out.push(`<text x="${tx}" y="${r1Y.toFixed(1)}" font-size="10.5" font-weight="700" fill="#000">${xmlEscape(label)}</text>`);
+        const pw = pushPill(tx + labelW + 6, r1Y, pillTxt);
+        out.push(`<text x="${(tx + labelW + 6 + pw + 6).toFixed(1)}" y="${r1Y.toFixed(1)}" font-size="10.5" font-weight="600" fill="#444">${xmlEscape(assignTxt)}</text>`);
+        out.push(`<text x="${tx}" y="${(ym + 9.5).toFixed(1)}" font-size="8.0" font-weight="500" fill="#666">${xmlEscape(extraTxt)}</text>`);
       } else {
-        out.push(`<text x="${bx + 12}" y="${(ym + 3.6).toFixed(1)}" font-size="10.5" font-weight="700" fill="#000">${xmlEscape(label)} — ${xmlEscape(rangeTxt)} (${sp.count})</text>`);
+        const r1Y = ym + 3.6;
+        out.push(`<text x="${tx}" y="${r1Y.toFixed(1)}" font-size="10.5" font-weight="700" fill="#000">${xmlEscape(label)}</text>`);
+        const pw = pushPill(tx + labelW + 6, r1Y, pillTxt);
+        out.push(`<text x="${(tx + labelW + 6 + pw + 6).toFixed(1)}" y="${r1Y.toFixed(1)}" font-size="10.5" font-weight="600" fill="#444">${xmlEscape(assignTxt)}</text>`);
       }
     });
 
@@ -1578,7 +1656,31 @@ textarea, input[type=text], input[type=number] {
   }
 
   function pdfEscape(str) {
-    return String(str).replace(/–/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+    return String(str)
+      .replace(/\\/g, '\\\\')
+      .replace(/\(/g, '\\(')
+      .replace(/\)/g, '\\)')
+      .replace(/–/g, '\\226')
+      .replace(/•/g, '\\225')
+      .replace(/[^\x20-\x7E]/g, '');
+  }
+
+  function drawPdfPill(cmds, x, baselineY, pillTxt) {
+    const tw = measureTextW(pillTxt, '600 8px Helvetica, Arial, sans-serif');
+    const pw = Math.max(36, tw + 10);
+    const ph = 12.2;
+    const py = baselineY - 2.6;
+    const r = ph / 2, k = r * 0.5523;
+    cmds.push('0.95 0.96 0.97 rg 0.72 0.72 0.72 RG 0.7 w [ ] 0 d');
+    cmds.push(`${(x + r).toFixed(1)} ${py.toFixed(1)} m`);
+    cmds.push(`${(x + pw - r).toFixed(1)} ${py.toFixed(1)} l`);
+    cmds.push(`${(x + pw - r + k).toFixed(1)} ${py.toFixed(1)} ${(x + pw).toFixed(1)} ${(py + r - k).toFixed(1)} ${(x + pw).toFixed(1)} ${(py + r).toFixed(1)} c`);
+    cmds.push(`${(x + pw).toFixed(1)} ${(py + r + k).toFixed(1)} ${(x + pw - r + k).toFixed(1)} ${(py + ph).toFixed(1)} ${(x + pw - r).toFixed(1)} ${(py + ph).toFixed(1)} c`);
+    cmds.push(`${(x + r).toFixed(1)} ${(py + ph).toFixed(1)} l`);
+    cmds.push(`${(x + r - k).toFixed(1)} ${(py + ph).toFixed(1)} ${x.toFixed(1)} ${(py + r + k).toFixed(1)} ${x.toFixed(1)} ${(py + r).toFixed(1)} c`);
+    cmds.push(`${x.toFixed(1)} ${(py + r - k).toFixed(1)} ${(x + r - k).toFixed(1)} ${py.toFixed(1)} ${(x + r).toFixed(1)} ${py.toFixed(1)} c B`);
+    cmds.push(`0.2 0.2 0.2 rg BT /F2 8.0 Tf ${(x + 5).toFixed(1)} ${(baselineY + 0.8).toFixed(1)} Td (${pdfEscape(pillTxt)}) Tj ET`);
+    return pw;
   }
 
   function buildAssignmentsPdf() {
@@ -1655,12 +1757,34 @@ textarea, input[type=text], input[type=number] {
       const bx = gridRightX + 10;
       cmds.push(`0.1 0.1 0.1 RG 1.2 w [ ] 0 d ${bx} ${y1.toFixed(1)} m ${bx + 5} ${y1.toFixed(1)} l ${bx + 5} ${y2.toFixed(1)} l ${bx} ${y2.toFixed(1)} l S`);
       const label = `#${sp.idx + 1} ${sp.name}`;
-      const rangeTxt = sp.firstId === sp.lastId ? sp.firstId : `${sp.firstId}-${sp.lastId}`;
-      if (y1 - y2 >= 24) {
-        cmds.push(`0 0 0 rg BT /F2 10.5 Tf ${bx + 12} ${(ym + 2.5).toFixed(1)} Td (${pdfEscape(label)}) Tj ET`);
-        cmds.push(`0.25 0.25 0.25 rg BT /F1 10.5 Tf ${bx + 12} ${(ym - 10.5).toFixed(1)} Td (${pdfEscape(`${rangeTxt} (${sp.count})`)}) Tj ET`);
+      const pillTxt = `extra ${Math.round(sp.pct)}%`;
+      const rangeTxt = sp.firstId === sp.lastId ? sp.firstId : `${sp.firstId}–${sp.lastId}`;
+      const assignTxt = `${rangeTxt} (${sp.count})`;
+      const extraTxt = `extra patient • lowest percentage (${sp.pct.toFixed(2)}%)`;
+      const labelW = measureTextW(label, '700 10.5px Helvetica, Arial, sans-serif');
+      const tx = bx + 12;
+      if (sp.hasExtra && y1 - y2 >= 34) {
+        const r1Y = ym + 6.5;
+        cmds.push(`0 0 0 rg BT /F2 10.5 Tf ${tx} ${r1Y.toFixed(1)} Td (${pdfEscape(label)}) Tj ET`);
+        drawPdfPill(cmds, tx + labelW + 6, r1Y, pillTxt);
+        cmds.push(`0.25 0.25 0.25 rg BT /F1 10.5 Tf ${tx} ${(ym - 5.5).toFixed(1)} Td (${pdfEscape(assignTxt)}) Tj ET`);
+        cmds.push(`0.4 0.4 0.4 rg BT /F1 8.0 Tf ${tx} ${(ym - 16.0).toFixed(1)} Td (${pdfEscape(extraTxt)}) Tj ET`);
+      } else if (!sp.hasExtra && y1 - y2 >= 24) {
+        const r1Y = ym + 2.5;
+        cmds.push(`0 0 0 rg BT /F2 10.5 Tf ${tx} ${r1Y.toFixed(1)} Td (${pdfEscape(label)}) Tj ET`);
+        drawPdfPill(cmds, tx + labelW + 6, r1Y, pillTxt);
+        cmds.push(`0.25 0.25 0.25 rg BT /F1 10.5 Tf ${tx} ${(ym - 10.5).toFixed(1)} Td (${pdfEscape(assignTxt)}) Tj ET`);
+      } else if (sp.hasExtra) {
+        const r1Y = ym + 2.0;
+        cmds.push(`0 0 0 rg BT /F2 10.5 Tf ${tx} ${r1Y.toFixed(1)} Td (${pdfEscape(label)}) Tj ET`);
+        const pw = drawPdfPill(cmds, tx + labelW + 6, r1Y, pillTxt);
+        cmds.push(`0.25 0.25 0.25 rg BT /F1 10.5 Tf ${(tx + labelW + 6 + pw + 6).toFixed(1)} ${r1Y.toFixed(1)} Td (${pdfEscape(assignTxt)}) Tj ET`);
+        cmds.push(`0.4 0.4 0.4 rg BT /F1 8.0 Tf ${tx} ${(ym - 9.5).toFixed(1)} Td (${pdfEscape(extraTxt)}) Tj ET`);
       } else {
-        cmds.push(`0 0 0 rg BT /F2 10.5 Tf ${bx + 12} ${(ym - 3.6).toFixed(1)} Td (${pdfEscape(`${label} - ${rangeTxt} (${sp.count})`)}) Tj ET`);
+        const r1Y = ym - 3.6;
+        cmds.push(`0 0 0 rg BT /F2 10.5 Tf ${tx} ${r1Y.toFixed(1)} Td (${pdfEscape(label)}) Tj ET`);
+        const pw = drawPdfPill(cmds, tx + labelW + 6, r1Y, pillTxt);
+        cmds.push(`0.25 0.25 0.25 rg BT /F1 10.5 Tf ${(tx + labelW + 6 + pw + 6).toFixed(1)} ${r1Y.toFixed(1)} Td (${pdfEscape(assignTxt)}) Tj ET`);
       }
     });
 
@@ -1671,8 +1795,8 @@ textarea, input[type=text], input[type=number] {
       '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
       '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n',
       '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>\nendobj\n',
-      '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
-      '5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n',
+      '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n',
+      '5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj\n',
       `6 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}\nendstream\nendobj\n`,
     ];
     let pdf = '%PDF-1.4\n';
@@ -1751,13 +1875,13 @@ textarea, input[type=text], input[type=number] {
     });
   });
   $('reset').addEventListener('click', () => {
-    if (!confirm('Mark every bed occupied again and reset the worker selections and "had extra" status to default?')) return;
+    if (!confirm('Mark every bed occupied again and reset worker selections and extra patient history to default?')) return;
     const keep = state.shifts;
-    const flaggedIds = workerPool().filter((w) => w.extra).map((w) => w.id);
-    allWorkers = allWorkers.map((w) => ({ ...w, extra: false }));
+    const resetIds = workerPool().filter((w) => w.shiftsWorked > 0 || w.extraCount > 0).map((w) => w.id);
+    allWorkers = allWorkers.map((w) => ({ ...w, shiftsWorked: 0, extraCount: 0 }));
     state = defaults();
-    state.workers = allWorkers.map((w) => ({ ...w, extra: false }));
-    // Worker counts and finalizations are kept; "had extra" is reset to nothing.
+    state.workers = allWorkers.map((w) => ({ ...w, shiftsWorked: 0, extraCount: 0 }));
+    // Worker counts and finalizations are kept; shiftsWorked and extraCount are reset to 0.
     for (const n of SHIFTS) {
       Object.assign(state.shifts[n], {
         workers: keep[n].workers,
@@ -1770,8 +1894,8 @@ textarea, input[type=text], input[type=number] {
       shared.empty = {};
       shared.workers = state.workers.map((w) => ({ ...w }));
       queue({ op: 'setAll', occupied: true, resetExtras: true });
-      if (flaggedIds.length) {
-        queue({ op: 'finalize', shift: tab(), counts: flaggedIds.map(() => 0), workerIds: flaggedIds, resetExtras: true });
+      if (resetIds.length) {
+        queue({ op: 'finalize', shift: tab(), counts: resetIds.map(() => 0), workerIds: resetIds, resetExtras: true });
       }
       for (const n of SHIFTS) {
         if (shared.shifts && shared.shifts[n]) {

@@ -123,21 +123,42 @@ test('finalize flags who got an extra patient, per shift', () => {
   assert.deepStrictEqual(s.shifts.AM.extras, [false, false, false]); // everyone had one: new round
 });
 
-test('finalize updates per-worker extra flags in KV across shifts', () => {
-  const initial = {
+test('finalize updates per-worker shiftsWorked and extraCount in KV and preserves them across bed edits', async () => {
+  const env = fakeEnv();
+  const initialSeed = {
     ...seed(),
     workers: [
-      { id: 'am1', name: 'Alex', shift: 'AM', extra: false },
-      { id: 'am2', name: 'Bri', shift: 'AM', extra: false },
-      { id: 'pm1', name: 'Jordan', shift: 'PM', extra: false },
+      { id: 'am1', name: 'Alex', shift: 'AM', shiftsWorked: 0, extraCount: 0 },
+      { id: 'am2', name: 'Bri', shift: 'AM', shiftsWorked: 0, extraCount: 0 },
+      { id: 'pm1', name: 'Jordan', shift: 'PM', shiftsWorked: 0, extraCount: 0 },
     ],
   };
-  const s = applyOps(initial, [
-    { op: 'finalize', shift: 'AM', counts: [4, 3, 3], workerIds: ['pm1', 'am1', 'am2'] },
+  let res = await call(env, 'POST', '/ops', {
+    code: 'secret-code',
+    body: {
+      seed: initialSeed,
+      ops: [{ op: 'finalize', shift: 'AM', counts: [4, 3, 3], workerIds: ['pm1', 'am1', 'am2'] }],
+    },
+  });
+  let s = await res.json();
+  assert.deepStrictEqual(s.workers.map((w) => ({ id: w.id, shiftsWorked: w.shiftsWorked, extraCount: w.extraCount })), [
+    { id: 'am1', shiftsWorked: 1, extraCount: 0 },
+    { id: 'am2', shiftsWorked: 1, extraCount: 0 },
+    { id: 'pm1', shiftsWorked: 1, extraCount: 1 },
   ]);
-  assert.deepStrictEqual(s.workers.map((w) => ({ id: w.id, extra: w.extra })), [
-    { id: 'am1', extra: false },
-    { id: 'am2', extra: false },
-    { id: 'pm1', extra: true },
+
+  // Subsequent non-finalize ops (like toggling a bed) preserve saved worker stats even if seed sends zeros
+  res = await call(env, 'POST', '/ops', {
+    code: 'secret-code',
+    body: {
+      seed: initialSeed,
+      ops: [{ op: 'setOccupied', room: '1', bed: 'A', occupied: false }],
+    },
+  });
+  s = await res.json();
+  assert.deepStrictEqual(s.workers.map((w) => ({ id: w.id, shiftsWorked: w.shiftsWorked, extraCount: w.extraCount })), [
+    { id: 'am1', shiftsWorked: 1, extraCount: 0 },
+    { id: 'am2', shiftsWorked: 1, extraCount: 0 },
+    { id: 'pm1', shiftsWorked: 1, extraCount: 1 },
   ]);
 });

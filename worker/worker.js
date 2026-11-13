@@ -11,7 +11,7 @@
  *       ...
  *     ],
  *     "workers": [
- *       { "id": "am1", "name": "Alex", "shift": "AM", "extra": true },
+ *       { "id": "am1", "name": "Alex", "shift": "AM", "shiftsWorked": 4, "extraCount": 1 },
  *       ...
  *     ],
  *     "shifts": {
@@ -90,36 +90,33 @@ export function nextFlags(flags, counts) {
 }
 
 /**
- * Updates per-worker `extra` status across the facility worker pool after a finalize.
- * Workers can fill in from any shift and retain or lose their `extra` status.
+ * Updates per-worker `shiftsWorked` and `extraCount` across the facility worker pool after a finalize.
+ * Everyone assigned to the finalized shift gets `shiftsWorked + 1`, and workers above the
+ * fewest patients on the shift also get `extraCount + 1`.
  */
 export function nextWorkerExtras(workers, shift, assignedIds, counts) {
   if (!Array.isArray(workers) || !workers.length) return [];
-  const out = workers.map((w) => ({ id: String(w.id), name: String(w.name), shift: w.shift, extra: !!w.extra }));
+  const out = workers.map((w) => ({
+    id: String(w.id),
+    name: String(w.name),
+    shift: w.shift,
+    shiftsWorked: Math.max(0, Math.floor(Number(w.shiftsWorked) || 0)),
+    extraCount: Math.max(0, Math.floor(Number(w.extraCount) || 0)),
+  }));
   const byId = new Map(out.map((w) => [w.id, w]));
   const ids = Array.isArray(assignedIds) ? assignedIds.slice(0, counts.length) : [];
-  const active = ids.map((id) => byId.get(id)).filter(Boolean);
-  if (active.length && active.every((w) => w.extra)) {
-    active.forEach((w) => { w.extra = false; });
-  }
-  const hadBefore = new Set(out.filter((w) => w.extra).map((w) => w.id));
-  const min = Math.min(...counts);
-  const gotSecond = new Set();
-  counts.forEach((c, i) => {
-    if (c > min) {
-      const w = byId.get(ids[i]);
-      if (w) {
-        if (hadBefore.has(w.id)) gotSecond.add(w.id);
-        w.extra = true;
-      }
-    }
+  const min = counts.length ? Math.min(...counts) : 0;
+  const worked = new Set();
+  const gotExtra = new Set();
+  ids.forEach((id, i) => {
+    const w = byId.get(id);
+    if (!w || worked.has(w.id)) return;
+    worked.add(w.id);
+    w.shiftsWorked += 1;
+    if (counts[i] > min) gotExtra.add(w.id);
   });
-  const shiftPool = out.filter((w) => w.shift === shift);
-  if (shiftPool.length && shiftPool.every((w) => w.extra)) {
-    shiftPool.forEach((w) => { w.extra = gotSecond.has(w.id); });
-  }
-  if (active.length && active.every((w) => w.extra)) {
-    active.forEach((w) => { w.extra = gotSecond.has(w.id); });
+  for (const id of gotExtra) {
+    byId.get(id).extraCount += 1;
   }
   return out;
 }
@@ -137,7 +134,9 @@ function cleanWorkers(list) {
     const shift = WORKER_GROUPS.includes(w.shift) ? w.shift : 'AM';
     if (!id || !name || seen.has(id)) continue;
     seen.add(id);
-    out.push({ id, name, shift, extra: !!w.extra });
+    const shiftsWorked = Math.max(0, Math.min(100000, Math.floor(Number(w.shiftsWorked) || 0)));
+    const extraCount = Math.max(0, Math.min(100000, Math.floor(Number(w.extraCount) || 0)));
+    out.push({ id, name, shift, shiftsWorked, extraCount });
   }
   return out;
 }
@@ -207,7 +206,7 @@ export function applyOps(state, ops) {
       case 'setAll':
         s.rooms.forEach((r) => r.beds.forEach((b) => { b.occupied = !!o.occupied; }));
         if (o.resetExtras) {
-          s.workers.forEach((w) => { w.extra = false; });
+          s.workers.forEach((w) => { w.shiftsWorked = 0; w.extraCount = 0; });
           for (const n of SHIFTS) s.shifts[n].extras = [];
         }
         break;
@@ -226,7 +225,7 @@ export function applyOps(state, ops) {
           throw new Error('finalize needs a list of patient counts');
         }
         if (o.resetExtras) {
-          s.workers.forEach((w) => { w.extra = false; });
+          s.workers.forEach((w) => { w.shiftsWorked = 0; w.extraCount = 0; });
           for (const n of SHIFTS) s.shifts[n].extras = [];
           break;
         }
@@ -280,11 +279,14 @@ export default {
           if (!body.seed) return json({ error: 'nothing saved yet and no starting layout sent' }, 409);
           current = cleanState(validateState(body.seed));
         } else if (body.seed && Array.isArray(body.seed.workers) && body.seed.workers.length) {
-          const savedExtra = new Map((current.workers || []).map((w) => [w.id, !!w.extra]));
-          current.workers = cleanWorkers(body.seed.workers).map((w) => ({
-            ...w,
-            extra: savedExtra.has(w.id) ? savedExtra.get(w.id) : !!w.extra,
-          }));
+          const savedStats = new Map((current.workers || []).map((w) => [w.id, {
+            shiftsWorked: Math.max(0, Math.floor(Number(w.shiftsWorked) || 0)),
+            extraCount: Math.max(0, Math.floor(Number(w.extraCount) || 0)),
+          }]));
+          current.workers = cleanWorkers(body.seed.workers).map((w) => {
+            const st = savedStats.get(w.id);
+            return st ? { ...w, ...st } : w;
+          });
         }
         const next = validateState(applyOps(current, body.ops));
         next.version = (current.version || 0) + 1;

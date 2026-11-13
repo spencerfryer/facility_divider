@@ -105,7 +105,7 @@ test('rooms.json is valid: 37 rooms, no room 13', () => {
   assert.ok(!rooms.some((r) => r.name === '13'));
 });
 
-const { pickExtras, nextFlags, parseWorkers, nextWorkerExtras } = Object.fromEntries(
+const { pickExtras, nextFlags, parseWorkers, workerRatio, nextWorkerExtras } = Object.fromEntries(
   Object.entries(sandbox.self.Divider).map(([k, fn]) => [k, wrap(fn)]));
 
 test('workers.json is valid and parses into alphabetized AM, PM, NOC, On Call workers with unique ids', () => {
@@ -115,38 +115,63 @@ test('workers.json is valid and parses into alphabetized AM, PM, NOC, On Call wo
   for (const shift of ['AM', 'PM', 'NOC', 'On Call']) {
     const group = pool.filter((w) => w.shift === shift);
     assert.ok(group.length >= 1);
-    assert.ok(group.every((w) => typeof w.id === 'string' && w.id && typeof w.name === 'string' && w.name && w.extra === false));
+    assert.ok(group.every((w) => typeof w.id === 'string' && w.id && typeof w.name === 'string' && w.name && w.shiftsWorked === 0 && w.extraCount === 0));
     const names = group.map((w) => w.name);
     const sorted = [...names].sort((a, b) => a.localeCompare(b));
     assert.deepStrictEqual(names, sorted);
   }
 });
 
-test('nextWorkerExtras tracks extras per worker across changing lineups and cross-shift fill-ins', () => {
+test('nextWorkerExtras increments shiftsWorked for everyone and extraCount for extra patients', () => {
   let pool = [
-    { id: 'am1', name: 'Alex', shift: 'AM', extra: false },
-    { id: 'am2', name: 'Bri', shift: 'AM', extra: false },
-    { id: 'am3', name: 'Casey', shift: 'AM', extra: false },
-    { id: 'pm1', name: 'Jordan', shift: 'PM', extra: false },
+    { id: 'am1', name: 'Alex', shift: 'AM', shiftsWorked: 0, extraCount: 0 },
+    { id: 'am2', name: 'Bri', shift: 'AM', shiftsWorked: 0, extraCount: 0 },
+    { id: 'am3', name: 'Casey', shift: 'AM', shiftsWorked: 0, extraCount: 0 },
+    { id: 'pm1', name: 'Jordan', shift: 'PM', shiftsWorked: 0, extraCount: 0 },
   ];
-  const extrasOf = (list) => Object.fromEntries(list.map((w) => [w.id, w.extra]));
 
-  // Day 1 (AM): am1, am2, pm1 (filling in from PM) work; pm1 gets extra (3, 3, 4)
+  // Day 1 (AM): am1, am2, pm1 work; pm1 gets extra (3, 3, 4) -> am3 untouched
   pool = nextWorkerExtras(pool, 'AM', ['am1', 'am2', 'pm1'], [3, 3, 4]);
-  assert.deepStrictEqual(extrasOf(pool), { am1: false, am2: false, am3: false, pm1: true });
+  assert.deepStrictEqual(pool.map((w) => [w.id, w.shiftsWorked, w.extraCount]), [
+    ['am1', 1, 0],
+    ['am2', 1, 0],
+    ['am3', 0, 0],
+    ['pm1', 1, 1],
+  ]);
 
-  // Day 2 (AM): am1, am2, am3 work; am1 & am2 get extra (4, 4, 3) -> pm1 still retains extra!
-  pool = nextWorkerExtras(pool, 'AM', ['am1', 'am2', 'am3'], [4, 4, 3]);
-  assert.deepStrictEqual(extrasOf(pool), { am1: true, am2: true, am3: false, pm1: true });
+  // Day 2 (AM): am1, am2, am3 work; even split (4, 4, 4) -> shiftsWorked increments, no extraCount increments
+  pool = nextWorkerExtras(pool, 'AM', ['am1', 'am2', 'am3'], [4, 4, 4]);
+  assert.deepStrictEqual(pool.map((w) => [w.id, w.shiftsWorked, w.extraCount]), [
+    ['am1', 2, 0],
+    ['am2', 2, 0],
+    ['am3', 1, 0],
+    ['pm1', 1, 1],
+  ]);
+});
 
-  // Day 3 (AM): am1, am2, am3 work; am3 gets extra (3, 3, 4) -> all AM workers have had extra, AM resets, pm1 still keeps extra!
-  pool = nextWorkerExtras(pool, 'AM', ['am1', 'am2', 'am3'], [3, 3, 4]);
-  assert.deepStrictEqual(extrasOf(pool), { am1: false, am2: false, am3: false, pm1: true });
+test('evenSizes uses worker extraCount/shiftsWorked ratio so lowest ratio gets next extras', () => {
+  const pool = [
+    { id: 'a', shiftsWorked: 4, extraCount: 2 }, // 50%
+    { id: 'b', shiftsWorked: 5, extraCount: 1 }, // 20%
+    { id: 'c', shiftsWorked: 4, extraCount: 0 }, // 0%
+    { id: 'd', shiftsWorked: 4, extraCount: 1 }, // 25%
+  ];
+  const ratios = pool.map(workerRatio);
+  assert.deepStrictEqual(evenSizes(13, 4, ratios), [3, 3, 4, 3]);
+  assert.deepStrictEqual(evenSizes(14, 4, ratios), [3, 4, 4, 3]);
 
-  // If an active lineup all has extra=true (e.g. pm1 fills in with others who have extra), it resets so they can rotate
-  pool = pool.map((w) => ({ ...w, extra: true }));
-  pool = nextWorkerExtras(pool, 'AM', ['am1', 'am2', 'pm1'], [3, 3, 4]);
-  assert.deepStrictEqual(extrasOf(pool), { am1: false, am2: false, am3: true, pm1: true });
+  // Unworked PRN fill-in (0/0 = 0%) vs seasoned staff with 25% gets 1 extra, then jumps to 100%
+  let sim = [
+    { id: 'ft1', name: 'A', shift: 'AM', shiftsWorked: 4, extraCount: 1 },
+    { id: 'ft2', name: 'B', shift: 'AM', shiftsWorked: 4, extraCount: 1 },
+    { id: 'prn', name: 'C', shift: 'On Call', shiftsWorked: 0, extraCount: 0 },
+  ];
+  const d1 = evenSizes(10, 3, sim.map(workerRatio));
+  assert.deepStrictEqual(d1, [3, 3, 4]);
+  sim = nextWorkerExtras(sim, 'AM', sim.map((w) => w.id), d1);
+  // Next day prn has 1/1 = 100%, ft1 & ft2 have 1/5 = 20%, so ft1 gets it next
+  const d2 = evenSizes(10, 3, sim.map(workerRatio));
+  assert.deepStrictEqual(d2, [4, 3, 3]);
 });
 
 test('extras skip workers who already had one this round', () => {
