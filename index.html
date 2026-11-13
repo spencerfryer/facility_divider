@@ -2147,6 +2147,7 @@ textarea, input[type=text], input[type=number] {
       out.push(`<text x="${(px + pw / 2).toFixed(1)}" y="${(baseY - 1.4).toFixed(1)}" text-anchor="middle" font-size="5.6" font-weight="600" fill="#333">${xmlEscape(pillTxt)}</text>`);
       return pw;
     };
+    const numColW = Math.ceil(Math.max(10, ...spans.map((sp) => measureTextW(`${sp.idx + 1}. `, '700 9.0px system-ui, -apple-system, sans-serif'))));
     spans.forEach((sp, k) => {
       const secTop = k === 0 ? gridTop : boundaryY[k - 1];
       const secBot = k === spans.length - 1 ? gridBot : boundaryY[k];
@@ -2155,24 +2156,28 @@ textarea, input[type=text], input[type=number] {
       const ym = (y1 + y2) / 2;
       const bx = gridRightX + 12;
       out.push(`<path d="M ${bx} ${y1.toFixed(1)} L ${bx + 5} ${y1.toFixed(1)} L ${bx + 5} ${y2.toFixed(1)} L ${bx} ${y2.toFixed(1)}" fill="none" stroke="#111" stroke-width="1.0"/>`);
-      const label = `${sp.idx + 1}. ${sp.name}`;
+      const numTxt = `${sp.idx + 1}.`;
+      const nameTxt = sp.name;
       const pillTxt = `extra ${Math.round(sp.pct)}%`;
       const countLbl = sp.load !== sp.count ? `${sp.count}, ${sp.load}wt` : `${sp.count}`;
       const assignTxt = `${sp.rangeTxt} (${countLbl})`;
       const extraTxt = `extra patient • lowest percentage (${sp.pct.toFixed(2)}%)`;
-      const labelW = measureTextW(label, '700 9.0px system-ui, -apple-system, sans-serif');
+      const nameW = measureTextW(nameTxt, '700 9.0px system-ui, -apple-system, sans-serif');
       const tx = bx + 12;
+      const nameX = tx + numColW;
       if (sp.hasExtra) {
         const r1Y = ym - 6.0;
-        out.push(`<text x="${tx}" y="${r1Y.toFixed(1)}" font-size="9.0" font-weight="700" fill="#000">${xmlEscape(label)}</text>`);
-        pushPill(tx + labelW + 5, r1Y, pillTxt);
-        out.push(`<text x="${tx}" y="${(ym + 4.5).toFixed(1)}" font-size="8.8" font-weight="600" fill="#444">${xmlEscape(assignTxt)}</text>`);
-        out.push(`<text x="${tx}" y="${(ym + 13.5).toFixed(1)}" font-size="7.0" font-weight="500" fill="#666">${xmlEscape(extraTxt)}</text>`);
+        out.push(`<text x="${tx}" y="${r1Y.toFixed(1)}" font-size="9.0" font-weight="700" fill="#000">${xmlEscape(numTxt)}</text>`);
+        out.push(`<text x="${nameX}" y="${r1Y.toFixed(1)}" font-size="9.0" font-weight="700" fill="#000">${xmlEscape(nameTxt)}</text>`);
+        pushPill(nameX + nameW + 5, r1Y, pillTxt);
+        out.push(`<text x="${nameX}" y="${(ym + 4.5).toFixed(1)}" font-size="8.8" font-weight="600" fill="#444">${xmlEscape(assignTxt)}</text>`);
+        out.push(`<text x="${nameX}" y="${(ym + 13.5).toFixed(1)}" font-size="7.0" font-weight="500" fill="#666">${xmlEscape(extraTxt)}</text>`);
       } else {
         const r1Y = ym - 1.5;
-        out.push(`<text x="${tx}" y="${r1Y.toFixed(1)}" font-size="9.0" font-weight="700" fill="#000">${xmlEscape(label)}</text>`);
-        pushPill(tx + labelW + 5, r1Y, pillTxt);
-        out.push(`<text x="${tx}" y="${(ym + 9.5).toFixed(1)}" font-size="8.8" font-weight="600" fill="#444">${xmlEscape(assignTxt)}</text>`);
+        out.push(`<text x="${tx}" y="${r1Y.toFixed(1)}" font-size="9.0" font-weight="700" fill="#000">${xmlEscape(numTxt)}</text>`);
+        out.push(`<text x="${nameX}" y="${r1Y.toFixed(1)}" font-size="9.0" font-weight="700" fill="#000">${xmlEscape(nameTxt)}</text>`);
+        pushPill(nameX + nameW + 5, r1Y, pillTxt);
+        out.push(`<text x="${nameX}" y="${(ym + 9.5).toFixed(1)}" font-size="8.8" font-weight="600" fill="#444">${xmlEscape(assignTxt)}</text>`);
       }
     });
 
@@ -2292,6 +2297,7 @@ textarea, input[type=text], input[type=number] {
     }
 
     const lowestBot = rowTopPdf(R - 1) - boxH;
+    const numColW = Math.ceil(Math.max(10, ...spans.map((sp) => measureTextW(`${sp.idx + 1}. `, '700 9.0px Helvetica, Arial, sans-serif'))));
     spans.forEach((sp, k) => {
       const secTop = k === 0 ? gridTop : boundaryY[k - 1];
       const secBot = k === spans.length - 1 ? lowestBot : boundaryY[k];
@@ -2300,24 +2306,28 @@ textarea, input[type=text], input[type=number] {
       const ym = (y1 + y2) / 2;
       const bx = gridRightX + 12;
       cmds.push(`0.1 0.1 0.1 RG 1.0 w [ ] 0 d ${bx} ${y1.toFixed(1)} m ${bx + 5} ${y1.toFixed(1)} l ${bx + 5} ${y2.toFixed(1)} l ${bx} ${y2.toFixed(1)} l S`);
-      const label = `${sp.idx + 1}. ${sp.name}`;
+      const numTxt = `${sp.idx + 1}.`;
+      const nameTxt = sp.name;
       const pillTxt = `extra ${Math.round(sp.pct)}%`;
       const countLbl = sp.load !== sp.count ? `${sp.count}, ${sp.load}wt` : `${sp.count}`;
       const assignTxt = `${sp.rangeTxt} (${countLbl})`;
       const extraTxt = `extra patient • lowest percentage (${sp.pct.toFixed(2)}%)`;
-      const labelW = measureTextW(label, '700 9.0px Helvetica, Arial, sans-serif');
+      const nameW = measureTextW(nameTxt, '700 9.0px Helvetica, Arial, sans-serif');
       const tx = bx + 12;
+      const nameX = tx + numColW;
       if (sp.hasExtra) {
         const r1Y = ym + 5.5;
-        cmds.push(`0 0 0 rg BT /F2 9.0 Tf ${tx} ${r1Y.toFixed(1)} Td (${pdfEscape(label)}) Tj ET`);
-        drawPdfPill(cmds, tx + labelW + 5, r1Y, pillTxt);
-        cmds.push(`0.25 0.25 0.25 rg BT /F1 8.8 Tf ${tx} ${(ym - 5.0).toFixed(1)} Td (${pdfEscape(assignTxt)}) Tj ET`);
-        cmds.push(`0.4 0.4 0.4 rg BT /F1 7.0 Tf ${tx} ${(ym - 14.0).toFixed(1)} Td (${pdfEscape(extraTxt)}) Tj ET`);
+        cmds.push(`0 0 0 rg BT /F2 9.0 Tf ${tx} ${r1Y.toFixed(1)} Td (${pdfEscape(numTxt)}) Tj ET`);
+        cmds.push(`0 0 0 rg BT /F2 9.0 Tf ${nameX} ${r1Y.toFixed(1)} Td (${pdfEscape(nameTxt)}) Tj ET`);
+        drawPdfPill(cmds, nameX + nameW + 5, r1Y, pillTxt);
+        cmds.push(`0.25 0.25 0.25 rg BT /F1 8.8 Tf ${nameX} ${(ym - 5.0).toFixed(1)} Td (${pdfEscape(assignTxt)}) Tj ET`);
+        cmds.push(`0.4 0.4 0.4 rg BT /F1 7.0 Tf ${nameX} ${(ym - 14.0).toFixed(1)} Td (${pdfEscape(extraTxt)}) Tj ET`);
       } else {
         const r1Y = ym + 2.0;
-        cmds.push(`0 0 0 rg BT /F2 9.0 Tf ${tx} ${r1Y.toFixed(1)} Td (${pdfEscape(label)}) Tj ET`);
-        drawPdfPill(cmds, tx + labelW + 5, r1Y, pillTxt);
-        cmds.push(`0.25 0.25 0.25 rg BT /F1 8.8 Tf ${tx} ${(ym - 9.0).toFixed(1)} Td (${pdfEscape(assignTxt)}) Tj ET`);
+        cmds.push(`0 0 0 rg BT /F2 9.0 Tf ${tx} ${r1Y.toFixed(1)} Td (${pdfEscape(numTxt)}) Tj ET`);
+        cmds.push(`0 0 0 rg BT /F2 9.0 Tf ${nameX} ${r1Y.toFixed(1)} Td (${pdfEscape(nameTxt)}) Tj ET`);
+        drawPdfPill(cmds, nameX + nameW + 5, r1Y, pillTxt);
+        cmds.push(`0.25 0.25 0.25 rg BT /F1 8.8 Tf ${nameX} ${(ym - 9.0).toFixed(1)} Td (${pdfEscape(assignTxt)}) Tj ET`);
       }
     });
 
