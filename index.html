@@ -2083,7 +2083,7 @@ textarea, input[type=text], input[type=number] {
     const boxH = Math.min(10.0, rowStep - 4.8);
     const gap = rowStep - boxH;
     const gridLeftX = 0;
-    const bedStartX = 28, bedW = Math.floor((80 - (maxBeds - 1) * 4) / maxBeds), bedGap = 4;
+    const bedStartX = 28, bedW = Math.floor((88 - (maxBeds - 1) * 8) / maxBeds), bedGap = 8;
     const gridRightX = bedStartX + maxBeds * bedW + (maxBeds - 1) * bedGap + 6;
     const midY = (r) => topY + r * rowStep - gap / 2;
 
@@ -2239,7 +2239,7 @@ textarea, input[type=text], input[type=number] {
     const boxH = Math.min(11.0, rowStep - 5.8);
     const gap = rowStep - boxH;
     const gridLeftX = marginX;
-    const bedStartX = gridLeftX + 28, bedW = Math.floor((80 - (maxBeds - 1) * 4) / maxBeds), bedGap = 4;
+    const bedStartX = gridLeftX + 28, bedW = Math.floor((88 - (maxBeds - 1) * 8) / maxBeds), bedGap = 8;
     const gridRightX = bedStartX + maxBeds * bedW + (maxBeds - 1) * bedGap + 6;
     const rowTopPdf = (r) => gridTop - r * rowStep;
     const midYPdf = (r) => rowTopPdf(r) + gap / 2;
