@@ -2083,7 +2083,7 @@ textarea, input[type=text], input[type=number] {
     const boxH = Math.min(10.0, rowStep - 4.8);
     const gap = rowStep - boxH;
     const gridLeftX = 0;
-    const bedStartX = 28, bedW = Math.floor((120 - (maxBeds - 1) * 5) / maxBeds), bedGap = 5;
+    const bedStartX = 28, bedW = Math.floor((80 - (maxBeds - 1) * 4) / maxBeds), bedGap = 4;
     const gridRightX = bedStartX + maxBeds * bedW + (maxBeds - 1) * bedGap + 6;
     const midY = (r) => topY + r * rowStep - gap / 2;
 
@@ -2102,7 +2102,7 @@ textarea, input[type=text], input[type=number] {
         const bh = boxH - 1.2;
         const disp = bedBoxDisplay(b, flatIdx, zoneForFlat(flatIdx), owners);
         flatIdx += 1;
-        const fSize = disp.compact ? '5.8' : (b.occupied ? '7.5' : '7.2');
+        const fSize = disp.compact ? '5.0' : (b.occupied ? '7.5' : '7.2');
         const textY = (ry + boxH * (disp.compact ? 0.72 : 0.76)).toFixed(1);
         if (b.occupied) {
           const fill = disp.isOutlier ? '#fde68a' : '#dfe7f2';
@@ -2239,7 +2239,7 @@ textarea, input[type=text], input[type=number] {
     const boxH = Math.min(11.0, rowStep - 5.8);
     const gap = rowStep - boxH;
     const gridLeftX = marginX;
-    const bedStartX = gridLeftX + 28, bedW = Math.floor((120 - (maxBeds - 1) * 5) / maxBeds), bedGap = 5;
+    const bedStartX = gridLeftX + 28, bedW = Math.floor((80 - (maxBeds - 1) * 4) / maxBeds), bedGap = 4;
     const gridRightX = bedStartX + maxBeds * bedW + (maxBeds - 1) * bedGap + 6;
     const rowTopPdf = (r) => gridTop - r * rowStep;
     const midYPdf = (r) => rowTopPdf(r) + gap / 2;
@@ -2257,7 +2257,7 @@ textarea, input[type=text], input[type=number] {
         const bh = boxH - 1.6;
         const disp = bedBoxDisplay(b, flatIdx, zoneForFlat(flatIdx), owners);
         flatIdx += 1;
-        const ptSize = disp.compact ? 5.8 : (b.occupied ? 7.6 : 7.3);
+        const ptSize = disp.compact ? 5.0 : (b.occupied ? 7.6 : 7.3);
         const fontSpec = `${b.occupied ? '700' : '600'} ${ptSize}px Helvetica, Arial, sans-serif`;
         const tw = measureTextW(disp.txt, fontSpec);
         const txPdf = bx + (bedW - tw) / 2;
