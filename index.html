@@ -351,6 +351,7 @@ textarea, input[type=text], input[type=number] {
       <div class="row" style="margin-top: 12px; margin-bottom: 0;">
         <button type="button" class="ghost" id="all-occ">Mark all occupied</button>
       </div>
+      <p class="sync" id="sync-status" style="margin-top: 8px; margin-bottom: 0;" hidden></p>
     </section>
 
     <section class="panel" aria-label="Assignments">
@@ -398,7 +399,6 @@ textarea, input[type=text], input[type=number] {
 
   <footer class="foot">
     <p>Rooms, beds, and worker assignments are shared through the passcode-protected bed list. <button type="button" class="link" id="reset">Reset everything</button></p>
-    <p class="sync" id="sync-status" hidden></p>
   </footer>
 
   <div id="worker-modal" class="worker-modal" role="dialog" aria-modal="true" aria-labelledby="worker-modal-title" hidden>
@@ -958,7 +958,7 @@ textarea, input[type=text], input[type=number] {
       pick.setAttribute('aria-expanded', String(isOpen));
       const dot = el('span', 'shift-dot');
       dot.style.background = shiftColor;
-      pick.append(dot, el('span', 'worker-label', staffName(i)), el('span', 'caret', '▾'));
+      pick.append(dot, el('span', 'worker-label', staffName(i)));
       pick.addEventListener('click', (e) => {
         e.stopPropagation();
         closeToolsMenu();
