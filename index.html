@@ -273,9 +273,8 @@ textarea, input[type=text], input[type=number] {
     font-size: 14pt;
     font-weight: 700;
     color: #000 !important;
-    text-align: center;
-    max-width: 460pt;
-    margin: 0 auto 8pt;
+    text-align: left;
+    margin: 0 0 8pt;
     padding-bottom: 4pt;
     border-bottom: 1.5pt solid #000;
   }
@@ -905,7 +904,7 @@ textarea, input[type=text], input[type=number] {
       t.tabIndex = on ? 0 : -1;
     }
     $('shift-panel').setAttribute('aria-labelledby', `tab-${tab()}`);
-    $('print-shift').textContent = `${tab()} assignments, ${new Date().toLocaleDateString()}`;
+    $('print-shift').textContent = `${tab()} Assignments ${new Date().toLocaleDateString()}`;
     if (document.activeElement !== countInput) countInput.value = workers();
 
     // Assignment list: one line per worker with their bed range.
@@ -1536,7 +1535,7 @@ textarea, input[type=text], input[type=number] {
       out.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`);
     }
 
-    // Staff brackets and 11.5pt labels aligned to the top of each bracket
+    // Staff brackets and 10.5pt labels vertically centered on each bracket
     const gridTop = topY;
     const gridBot = topY + (R - 1) * rowStep + boxH;
     spans.forEach((sp, k) => {
@@ -1544,16 +1543,16 @@ textarea, input[type=text], input[type=number] {
       const secBot = k === spans.length - 1 ? gridBot : boundaryY[k];
       const y1 = secTop + 2;
       const y2 = Math.max(y1 + 6, secBot - 2);
+      const ym = (y1 + y2) / 2;
       const bx = gridRightX + 10;
       out.push(`<path d="M ${bx} ${y1.toFixed(1)} L ${bx + 5} ${y1.toFixed(1)} L ${bx + 5} ${y2.toFixed(1)} L ${bx} ${y2.toFixed(1)}" fill="none" stroke="#111" stroke-width="1.3"/>`);
       const label = `#${sp.idx + 1} ${sp.name}`;
       const rangeTxt = sp.firstId === sp.lastId ? sp.firstId : `${sp.firstId}–${sp.lastId}`;
-      const topTextY = y1 + 9.2;
       if (y2 - y1 >= 24) {
-        out.push(`<text x="${bx + 12}" y="${topTextY.toFixed(1)}" font-size="11.5" font-weight="700" fill="#000">${xmlEscape(label)}</text>`);
-        out.push(`<text x="${bx + 12}" y="${(topTextY + 13.5).toFixed(1)}" font-size="11.5" font-weight="600" fill="#444">${xmlEscape(rangeTxt)} (${sp.count})</text>`);
+        out.push(`<text x="${bx + 12}" y="${(ym - 2.0).toFixed(1)}" font-size="10.5" font-weight="700" fill="#000">${xmlEscape(label)}</text>`);
+        out.push(`<text x="${bx + 12}" y="${(ym + 11.0).toFixed(1)}" font-size="10.5" font-weight="600" fill="#444">${xmlEscape(rangeTxt)} (${sp.count})</text>`);
       } else {
-        out.push(`<text x="${bx + 12}" y="${topTextY.toFixed(1)}" font-size="11.5" font-weight="700" fill="#000">${xmlEscape(label)} — ${xmlEscape(rangeTxt)} (${sp.count})</text>`);
+        out.push(`<text x="${bx + 12}" y="${(ym + 3.6).toFixed(1)}" font-size="10.5" font-weight="700" fill="#000">${xmlEscape(label)} — ${xmlEscape(rangeTxt)} (${sp.count})</text>`);
       }
     });
 
@@ -1569,12 +1568,12 @@ textarea, input[type=text], input[type=number] {
     const rooms = buildRooms();
     const allBeds = rooms.flatMap((r) => r.beds);
     const { groups } = divideBeds(allBeds, workers(), extras());
-    const title = `${tab()} assignments, ${new Date().toLocaleDateString()}`;
+    const title = `${tab()} Assignments ${new Date().toLocaleDateString()}`;
     const cmds = [];
     let topLineY = 754;
-    cmds.push(`0 0 0 rg BT /F2 14 Tf 112 ${topLineY} Td (${pdfEscape(title)}) Tj ET`);
+    cmds.push(`0 0 0 rg BT /F2 14 Tf 36 ${topLineY} Td (${pdfEscape(title)}) Tj ET`);
     topLineY -= 6;
-    cmds.push(`0 0 0 RG 1.2 w 76 ${topLineY} m 536 ${topLineY} l S`);
+    cmds.push(`0 0 0 RG 1.2 w 36 ${topLineY} m 576 ${topLineY} l S`);
 
     // Centered visual room grid + brackets + 11.5pt top-aligned labels on US Letter (612x792pt)
     const R = rooms.length || 1;
@@ -1634,16 +1633,16 @@ textarea, input[type=text], input[type=number] {
       const secBot = k === spans.length - 1 ? lowestBot : boundaryY[k];
       const y1 = secTop - 2;
       const y2 = Math.min(y1 - 6, secBot + 2);
+      const ym = (y1 + y2) / 2;
       const bx = gridRightX + 10;
       cmds.push(`0.1 0.1 0.1 RG 1.2 w [ ] 0 d ${bx} ${y1.toFixed(1)} m ${bx + 5} ${y1.toFixed(1)} l ${bx + 5} ${y2.toFixed(1)} l ${bx} ${y2.toFixed(1)} l S`);
       const label = `#${sp.idx + 1} ${sp.name}`;
       const rangeTxt = sp.firstId === sp.lastId ? sp.firstId : `${sp.firstId}-${sp.lastId}`;
-      const topTextY = y1 - 9.2;
       if (y1 - y2 >= 24) {
-        cmds.push(`0 0 0 rg BT /F2 11.5 Tf ${bx + 12} ${topTextY.toFixed(1)} Td (${pdfEscape(label)}) Tj ET`);
-        cmds.push(`0.25 0.25 0.25 rg BT /F1 11.5 Tf ${bx + 12} ${(topTextY - 13.5).toFixed(1)} Td (${pdfEscape(`${rangeTxt} (${sp.count})`)}) Tj ET`);
+        cmds.push(`0 0 0 rg BT /F2 10.5 Tf ${bx + 12} ${(ym + 2.5).toFixed(1)} Td (${pdfEscape(label)}) Tj ET`);
+        cmds.push(`0.25 0.25 0.25 rg BT /F1 10.5 Tf ${bx + 12} ${(ym - 10.5).toFixed(1)} Td (${pdfEscape(`${rangeTxt} (${sp.count})`)}) Tj ET`);
       } else {
-        cmds.push(`0 0 0 rg BT /F2 11.5 Tf ${bx + 12} ${topTextY.toFixed(1)} Td (${pdfEscape(`${label} - ${rangeTxt} (${sp.count})`)}) Tj ET`);
+        cmds.push(`0 0 0 rg BT /F2 10.5 Tf ${bx + 12} ${(ym - 3.6).toFixed(1)} Td (${pdfEscape(`${label} - ${rangeTxt} (${sp.count})`)}) Tj ET`);
       }
     });
 
