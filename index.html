@@ -260,22 +260,38 @@ textarea, input[type=text], input[type=number] {
 .finalizations-title { font-weight: 600; margin-bottom: 2px; }
 .finalizations-list { white-space: pre-line; line-height: 1.45; }
 
-@page { margin: 0.45in; }
+@page { size: letter portrait; margin: 0.3in; }
 @media print {
   :root { color-scheme: light; }
-  html, body { background: #fff !important; color: #000 !important; font-size: 14px; }
+  html, body { background: #fff !important; color: #000 !important; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .top, .row, .hint, .worker-menu, .worker-modal, .worker-pick .caret, .shift-dot, .tabs, #finalize-status, .finalizations, .foot, .layout-note, .sync, #edit-toggle, .remove-bed, .add-bed, .check, section:first-of-type { display: none !important; }
   main { max-width: none; padding: 0; margin: 0; }
   .panel { background: #fff !important; color: #000 !important; border: none; padding: 0; margin: 0; }
   .panel > h2 { display: none; }
-  .print-only {
+  #print-shift {
     display: block;
-    font-size: 1.25rem;
+    font-size: 1.15rem;
     font-weight: 700;
     color: #000 !important;
     margin: 0 0 8px;
-    padding-bottom: 6px;
+    padding-bottom: 4px;
     border-bottom: 2px solid #000;
+  }
+  .print-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 18px;
+    align-items: start;
+  }
+  #print-room-map {
+    display: block !important;
+    width: 100%;
+  }
+  #print-room-map svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 9.6in;
   }
   .tag { display: none !important; }
   .assign-list { gap: 0; border-top: 1px solid #bbb; }
@@ -285,11 +301,11 @@ textarea, input[type=text], input[type=number] {
     border: none;
     border-bottom: 1px solid #bbb;
     border-radius: 0;
-    padding: 6px 4px;
+    padding: 4px 2px;
     display: grid;
-    grid-template-columns: minmax(120px, 1.3fr) 2fr auto;
+    grid-template-columns: minmax(88px, 1.2fr) 1.7fr auto;
     align-items: baseline;
-    column-gap: 16px;
+    column-gap: 10px;
     break-inside: avoid;
     page-break-inside: avoid;
   }
@@ -302,7 +318,7 @@ textarea, input[type=text], input[type=number] {
     color: #000 !important;
     padding: 0;
     min-height: 0;
-    font-size: 1.05rem;
+    font-size: 0.95rem;
     font-weight: 700;
   }
   .assign-list .range {
@@ -310,14 +326,14 @@ textarea, input[type=text], input[type=number] {
     grid-row: 1;
     padding-left: 0;
     margin: 0;
-    font-size: 1.05rem;
+    font-size: 0.95rem;
     font-weight: 600;
     color: #000 !important;
   }
   .assign-list .count {
     grid-column: 3;
     grid-row: 1;
-    font-size: 0.98rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: #000 !important;
     text-align: right;
@@ -326,7 +342,7 @@ textarea, input[type=text], input[type=number] {
     grid-column: 2 / -1;
     padding-left: 0;
     margin: 1px 0 0;
-    font-size: 0.82rem;
+    font-size: 0.76rem;
     color: #333 !important;
   }
 }
@@ -371,7 +387,10 @@ textarea, input[type=text], input[type=number] {
           </div>
         </div>
         <p class="hint">Click on worker name to assign or change worker</p>
-        <ol id="results" class="assign-list" aria-live="polite"></ol>
+        <div class="print-body">
+          <div class="print-only" id="print-room-map" aria-hidden="true"></div>
+          <ol id="results" class="assign-list" aria-live="polite"></ol>
+        </div>
         <div class="row" style="margin-top: 12px; margin-bottom: 0; justify-content: space-between;">
           <div class="worker-wrap">
             <button type="button" class="ghost icon-btn" id="worker-tools-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Backup or import worker list" title="Backup or import worker list">
@@ -995,6 +1014,8 @@ textarea, input[type=text], input[type=number] {
       results.append(li);
     });
 
+    renderPrintMap(rooms, groups);
+
     const modal = $('worker-modal');
     const modalBody = $('worker-modal-body');
     if (openMenuSlot >= 0 && openMenuSlot < groups.length) {
@@ -1467,6 +1488,133 @@ textarea, input[type=text], input[type=number] {
     }
   });
 
+  function xmlEscape(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function computePrintSplits(rooms, groups) {
+    const posById = new Map();
+    rooms.forEach((r, rIdx) => {
+      r.beds.forEach((b, cIdx) => {
+        posById.set(b.id, { r: rIdx, c: cIdx });
+      });
+    });
+    const spans = groups.map((g, i) => {
+      const ids = g.occupied.length ? g.occupied : g.empty;
+      if (!ids.length) return null;
+      return {
+        idx: i,
+        name: staffName(i),
+        count: g.occupied.length,
+        firstId: ids[0],
+        lastId: ids[ids.length - 1],
+        first: posById.get(ids[0]),
+        last: posById.get(ids[ids.length - 1]),
+      };
+    }).filter(Boolean);
+    const splits = [];
+    for (let k = 0; k < spans.length - 1; k++) {
+      const prev = spans[k].last;
+      const next = spans[k + 1].first;
+      if (!prev || !next) continue;
+      if (prev.r === next.r) {
+        splits.push({ r: next.r, c: next.c, afterIdx: k });
+      } else {
+        splits.push({ r: next.r, c: 0, afterIdx: k });
+      }
+    }
+    return { spans, splits };
+  }
+
+  function renderPrintMap(rooms, groups) {
+    const container = $('print-room-map');
+    if (!container) return;
+    const R = rooms.length || 1;
+    const maxBeds = Math.max(1, ...rooms.map((r) => r.beds.length));
+    const W = 360, H = 900;
+    const topY = 26, availH = H - topY - 4;
+    const rowStep = availH / R;
+    const boxH = Math.min(18.8, rowStep - 4.2);
+    const gap = rowStep - boxH;
+    const bedStartX = 34, bedW = Math.floor((194 - (maxBeds - 1) * 5) / maxBeds), bedGap = 5;
+    const gridRightX = bedStartX + maxBeds * bedW + (maxBeds - 1) * bedGap + 6;
+    const midY = (r) => topY + r * rowStep - gap / 2;
+
+    const { spans, splits } = computePrintSplits(rooms, groups);
+    const out = [];
+    out.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" font-family="system-ui, -apple-system, sans-serif">`);
+    // Legend
+    out.push(`<rect x="4" y="5" width="12" height="12" rx="2" fill="#dfe7f2" stroke="#111" stroke-width="1.1"/>`);
+    out.push(`<text x="20" y="14.5" font-size="9.5" font-weight="600" fill="#111">Occupied</text>`);
+    out.push(`<rect x="74" y="5" width="12" height="12" rx="2" fill="#fff" stroke="#888" stroke-width="0.9" stroke-dasharray="2.5,2"/>`);
+    out.push(`<text x="90" y="14.5" font-size="9.5" font-weight="600" fill="#444">Empty</text>`);
+    out.push(`<line x1="132" y1="11" x2="152" y2="11" stroke="#000" stroke-width="2.4" stroke-linecap="round"/>`);
+    out.push(`<text x="156" y="14.5" font-size="9.5" font-weight="600" fill="#111">Staff division</text>`);
+
+    // Rooms and beds
+    rooms.forEach((room, r) => {
+      const ry = topY + r * rowStep;
+      out.push(`<rect x="4" y="${ry.toFixed(1)}" width="${(gridRightX - 4).toFixed(1)}" height="${boxH.toFixed(1)}" rx="3" fill="none" stroke="#ccc" stroke-width="0.7"/>`);
+      out.push(`<text x="19" y="${(ry + boxH * 0.72).toFixed(1)}" text-anchor="middle" font-size="10.2" font-weight="700" fill="#000">${xmlEscape(room.name)}</text>`);
+      room.beds.forEach((b, c) => {
+        const bx = bedStartX + c * (bedW + bedGap);
+        const by = ry + 1.2;
+        const bh = boxH - 2.4;
+        if (b.occupied) {
+          out.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bedW.toFixed(1)}" height="${bh.toFixed(1)}" rx="2.2" fill="#dfe7f2" stroke="#111" stroke-width="1.1"/>`);
+          out.push(`<text x="${(bx + bedW / 2).toFixed(1)}" y="${(ry + boxH * 0.72).toFixed(1)}" text-anchor="middle" font-size="9.8" font-weight="700" fill="#000">${xmlEscape(b.label)}</text>`);
+        } else {
+          out.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bedW.toFixed(1)}" height="${bh.toFixed(1)}" rx="2.2" fill="#fff" stroke="#888" stroke-width="0.85" stroke-dasharray="2.5,2"/>`);
+          out.push(`<text x="${(bx + bedW / 2).toFixed(1)}" y="${(ry + boxH * 0.72).toFixed(1)}" text-anchor="middle" font-size="9.2" font-weight="600" fill="#777">${xmlEscape(b.label)}</text>`);
+        }
+      });
+    });
+
+    // Division lines across the room grid
+    const boundaryY = [];
+    for (const sp of splits) {
+      const leftX = 2;
+      const rightX = gridRightX + 2;
+      const yAbove = midY(sp.r);
+      const yBelow = midY(sp.r + 1);
+      let d;
+      if (sp.c === 0) {
+        d = `M ${leftX} ${yAbove.toFixed(1)} L ${rightX} ${yAbove.toFixed(1)}`;
+        boundaryY.push(yAbove);
+      } else {
+        const sx = bedStartX + sp.c * (bedW + bedGap) - bedGap / 2;
+        d = `M ${leftX} ${yBelow.toFixed(1)} L ${sx.toFixed(1)} ${yBelow.toFixed(1)} L ${sx.toFixed(1)} ${yAbove.toFixed(1)} L ${rightX} ${yAbove.toFixed(1)}`;
+        boundaryY.push((yAbove + yBelow) / 2);
+      }
+      out.push(`<path d="${d}" fill="none" stroke="#fff" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>`);
+      out.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`);
+    }
+
+    // Staff brackets and labels along the right side of the room grid
+    const gridTop = topY;
+    const gridBot = topY + (R - 1) * rowStep + boxH;
+    spans.forEach((sp, k) => {
+      const secTop = k === 0 ? gridTop : boundaryY[k - 1];
+      const secBot = k === spans.length - 1 ? gridBot : boundaryY[k];
+      const y1 = secTop + 2;
+      const y2 = Math.max(y1 + 6, secBot - 2);
+      const ym = (y1 + y2) / 2;
+      const bx = gridRightX + 6;
+      out.push(`<path d="M ${bx} ${y1.toFixed(1)} L ${bx + 4} ${y1.toFixed(1)} L ${bx + 4} ${y2.toFixed(1)} L ${bx} ${y2.toFixed(1)}" fill="none" stroke="#111" stroke-width="1.3"/>`);
+      const label = `#${sp.idx + 1} ${sp.name}`;
+      if (y2 - y1 >= 24) {
+        out.push(`<text x="${bx + 9}" y="${(ym - 1.5).toFixed(1)}" font-size="9.8" font-weight="700" fill="#000">${xmlEscape(label)}</text>`);
+        const rangeTxt = sp.firstId === sp.lastId ? sp.firstId : `${sp.firstId}–${sp.lastId}`;
+        out.push(`<text x="${bx + 9}" y="${(ym + 9.5).toFixed(1)}" font-size="8.6" font-weight="600" fill="#444">${xmlEscape(rangeTxt)} (${sp.count})</text>`);
+      } else {
+        out.push(`<text x="${bx + 9}" y="${(ym + 3.2).toFixed(1)}" font-size="9.2" font-weight="700" fill="#000">${xmlEscape(label)}</text>`);
+      }
+    });
+
+    out.push(`</svg>`);
+    container.innerHTML = out.join('');
+  }
+
   function pdfEscape(str) {
     return String(str).replace(/–/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
   }
@@ -1478,11 +1626,88 @@ textarea, input[type=text], input[type=number] {
     const { groups } = divideBeds(allBeds, workers(), extras());
     const title = `${tab()} assignments, ${new Date().toLocaleDateString()}`;
     const cmds = [];
-    let y = 748;
-    cmds.push(`BT /F2 15 Tf 36 ${y} Td (${pdfEscape(title)}) Tj ET`);
-    y -= 8;
-    cmds.push(`0 0 0 RG 1.2 w 36 ${y} m 576 ${y} l S`);
-    const rowH = Math.min(34, Math.max(18, Math.floor(680 / Math.max(1, groups.length))));
+    let topLineY = 754;
+    cmds.push(`0 0 0 rg BT /F2 14 Tf 24 ${topLineY} Td (${pdfEscape(title)}) Tj ET`);
+    topLineY -= 6;
+    cmds.push(`0 0 0 RG 1.2 w 24 ${topLineY} m 588 ${topLineY} l S`);
+
+    // Left column (x = 24..294): Visual room grid with staff divisions
+    const R = rooms.length || 1;
+    const maxBeds = Math.max(1, ...rooms.map((r) => r.beds.length));
+    const gridTop = topLineY - 22;
+    const gridBot = 24;
+    const availH = gridTop - gridBot;
+    const rowStep = availH / R;
+    const boxH = Math.min(15.2, rowStep - 3.2);
+    const gap = rowStep - boxH;
+    const bedStartX = 48, bedW = Math.floor((144 - (maxBeds - 1) * 4) / maxBeds), bedGap = 4;
+    const gridRightX = bedStartX + maxBeds * bedW + (maxBeds - 1) * bedGap + 4;
+    const rowTopPdf = (r) => gridTop - r * rowStep;
+    const midYPdf = (r) => rowTopPdf(r) + gap / 2;
+
+    // Legend on left column
+    const legY = topLineY - 14;
+    cmds.push(`0.87 0.91 0.95 rg 0 0 0 RG 0.8 w [ ] 0 d 24 ${legY} 8 8 re B`);
+    cmds.push(`0 0 0 rg BT /F2 7.5 Tf 35 ${legY + 1.5} Td (Occupied) Tj ET`);
+    cmds.push(`1 1 1 rg 0.5 0.5 0.5 RG 0.7 w [2 1.5] 0 d 78 ${legY} 8 8 re B`);
+    cmds.push(`0.25 0.25 0.25 rg BT /F1 7.5 Tf 89 ${legY + 1.5} Td (Empty) Tj ET`);
+    cmds.push(`0 0 0 RG 2 w [ ] 0 d 122 ${legY + 4} m 138 ${legY + 4} l S`);
+    cmds.push(`0 0 0 rg BT /F2 7.5 Tf 141 ${legY + 1.5} Td (Staff division) Tj ET`);
+
+    rooms.forEach((room, r) => {
+      const rTop = rowTopPdf(r);
+      const rBot = rTop - boxH;
+      cmds.push(`0.8 0.8 0.8 RG 0.5 w [ ] 0 d 24 ${rBot.toFixed(1)} ${(gridRightX - 24).toFixed(1)} ${boxH.toFixed(1)} re S`);
+      cmds.push(`0 0 0 rg BT /F2 8 Tf 28 ${(rBot + boxH * 0.28).toFixed(1)} Td (${pdfEscape(room.name)}) Tj ET`);
+      room.beds.forEach((b, c) => {
+        const bx = bedStartX + c * (bedW + bedGap);
+        const by = rBot + 1;
+        const bh = boxH - 2;
+        if (b.occupied) {
+          cmds.push(`0.87 0.91 0.95 rg 0.1 0.1 0.1 RG 0.8 w [ ] 0 d ${bx.toFixed(1)} ${by.toFixed(1)} ${bedW.toFixed(1)} ${bh.toFixed(1)} re B`);
+          cmds.push(`0 0 0 rg BT /F2 7.8 Tf ${(bx + bedW / 2 - 3).toFixed(1)} ${(rBot + boxH * 0.28).toFixed(1)} Td (${pdfEscape(b.label)}) Tj ET`);
+        } else {
+          cmds.push(`1 1 1 rg 0.55 0.55 0.55 RG 0.6 w [2 1.5] 0 d ${bx.toFixed(1)} ${by.toFixed(1)} ${bedW.toFixed(1)} ${bh.toFixed(1)} re B`);
+          cmds.push(`0.45 0.45 0.45 rg BT /F1 7.5 Tf ${(bx + bedW / 2 - 2.8).toFixed(1)} ${(rBot + boxH * 0.28).toFixed(1)} Td (${pdfEscape(b.label)}) Tj ET`);
+        }
+      });
+    });
+
+    const { spans, splits } = computePrintSplits(rooms, groups);
+    const boundaryY = [];
+    for (const sp of splits) {
+      const leftX = 22;
+      const rightX = gridRightX + 2;
+      const yAbove = midYPdf(sp.r);
+      const yBelow = midYPdf(sp.r + 1);
+      cmds.push(`0 0 0 RG 2 w [ ] 0 d`);
+      if (sp.c === 0) {
+        cmds.push(`${leftX} ${yAbove.toFixed(1)} m ${rightX} ${yAbove.toFixed(1)} l S`);
+        boundaryY.push(yAbove);
+      } else {
+        const sx = bedStartX + sp.c * (bedW + bedGap) - bedGap / 2;
+        cmds.push(`${leftX} ${yBelow.toFixed(1)} m ${sx.toFixed(1)} ${yBelow.toFixed(1)} l ${sx.toFixed(1)} ${yAbove.toFixed(1)} l ${rightX} ${yAbove.toFixed(1)} l S`);
+        boundaryY.push((yAbove + yBelow) / 2);
+      }
+    }
+
+    const lowestBot = rowTopPdf(R - 1) - boxH;
+    spans.forEach((sp, k) => {
+      const secTop = k === 0 ? gridTop : boundaryY[k - 1];
+      const secBot = k === spans.length - 1 ? lowestBot : boundaryY[k];
+      const y1 = secTop - 1.5;
+      const y2 = Math.min(y1 - 4, secBot + 1.5);
+      const ym = (y1 + y2) / 2;
+      const bx = gridRightX + 4;
+      cmds.push(`0.1 0.1 0.1 RG 0.9 w [ ] 0 d ${bx} ${y1.toFixed(1)} m ${bx + 3} ${y1.toFixed(1)} l ${bx + 3} ${y2.toFixed(1)} l ${bx} ${y2.toFixed(1)} l S`);
+      const label = `#${sp.idx + 1} ${sp.name}`;
+      cmds.push(`0 0 0 rg BT /F2 7.8 Tf ${bx + 6} ${(ym - 2.5).toFixed(1)} Td (${pdfEscape(label)}) Tj ET`);
+    });
+
+    // Right column (x = 306..588): Assignment list
+    let y = topLineY - 8;
+    const rowH = Math.min(32, Math.max(18, Math.floor(690 / Math.max(1, groups.length))));
+    cmds.push(`0.75 0.75 0.75 RG 0.5 w [ ] 0 d 306 ${y} m 588 ${y} l S`);
     groups.forEach((g, i) => {
       const name = staffName(i);
       const occ = g.occupied;
@@ -1494,16 +1719,16 @@ textarea, input[type=text], input[type=number] {
         if (sk.length) skipped = `Skip (empty): ${sk.join(', ')}`;
       }
       const countStr = `${occ.length} patient${occ.length === 1 ? '' : 's'}`;
-      const textY = y - (skipped ? Math.round(rowH * 0.45) : Math.round(rowH * 0.62));
-      cmds.push(`0 0 0 rg BT /F2 11 Tf 40 ${textY} Td (${pdfEscape(name)}) Tj ET`);
-      cmds.push(`0 0 0 rg BT /F2 11 Tf 190 ${textY} Td (${pdfEscape(range)}) Tj ET`);
-      const countX = 572 - countStr.length * 5.6;
-      cmds.push(`0 0 0 rg BT /F2 10.5 Tf ${countX.toFixed(1)} ${textY} Td (${pdfEscape(countStr)}) Tj ET`);
+      const textY = y - (skipped ? Math.round(rowH * 0.44) : Math.round(rowH * 0.62));
+      cmds.push(`0 0 0 rg BT /F2 9.8 Tf 308 ${textY} Td (${pdfEscape(name)}) Tj ET`);
+      cmds.push(`0 0 0 rg BT /F2 9.8 Tf 404 ${textY} Td (${pdfEscape(range)}) Tj ET`);
+      const countX = 586 - countStr.length * 4.8;
+      cmds.push(`0 0 0 rg BT /F2 9.2 Tf ${countX.toFixed(1)} ${textY} Td (${pdfEscape(countStr)}) Tj ET`);
       if (skipped) {
-        cmds.push(`0.25 0.25 0.25 rg BT /F1 8.5 Tf 190 ${textY - 11} Td (${pdfEscape(skipped)}) Tj ET`);
+        cmds.push(`0.25 0.25 0.25 rg BT /F1 7.6 Tf 404 ${textY - 9.5} Td (${pdfEscape(skipped.slice(0, 46))}) Tj ET`);
       }
       y -= rowH;
-      cmds.push(`0.75 0.75 0.75 RG 0.5 w 36 ${y} m 576 ${y} l S`);
+      cmds.push(`0.75 0.75 0.75 RG 0.5 w [ ] 0 d 306 ${y} m 588 ${y} l S`);
     });
     const stream = cmds.join('\n');
     const objs = [
