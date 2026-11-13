@@ -293,8 +293,18 @@ textarea, input[type=text], input[type=number] {
     width: 440pt;
     height: auto;
     max-width: 100%;
-    max-height: 8.2in;
+    max-height: 8.0in;
     margin: 0;
+  }
+  #print-stamp {
+    display: block !important;
+    position: fixed;
+    left: 0.4in;
+    bottom: 0.35in;
+    margin: 0;
+    font-size: 8.5pt;
+    line-height: 1.2;
+    color: #555 !important;
   }
   .tag { display: none !important; }
 }
@@ -343,6 +353,7 @@ textarea, input[type=text], input[type=number] {
           <div class="print-only" id="print-room-map" aria-hidden="true"></div>
           <ol id="results" class="assign-list" aria-live="polite"></ol>
         </div>
+        <p class="print-only" id="print-stamp"></p>
         <div class="row" style="margin-top: 12px; margin-bottom: 0; justify-content: space-between;">
           <div class="worker-wrap">
             <button type="button" class="ghost icon-btn" id="worker-tools-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Backup or import worker list" title="Backup or import worker list">
@@ -906,6 +917,7 @@ textarea, input[type=text], input[type=number] {
     }
     $('shift-panel').setAttribute('aria-labelledby', `tab-${tab()}`);
     $('print-shift').textContent = `${new Date().toLocaleDateString()} ${tab()} Assignments`;
+    $('print-stamp').textContent = formatPrintStamp();
     if (document.activeElement !== countInput) countInput.value = workers();
 
     // Assignment list: one line per worker with their bed range.
@@ -1561,6 +1573,12 @@ textarea, input[type=text], input[type=number] {
     container.innerHTML = out.join('');
   }
 
+  function formatPrintStamp() {
+    const d = new Date();
+    const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+    return `Printed ${d.toLocaleDateString()} ${time}`;
+  }
+
   function pdfEscape(str) {
     return String(str).replace(/–/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
   }
@@ -1580,7 +1598,7 @@ textarea, input[type=text], input[type=number] {
     const R = rooms.length || 1;
     const maxBeds = Math.max(1, ...rooms.map((r) => r.beds.length));
     const gridTop = topLineY - 10;
-    const gridBot = 28;
+    const gridBot = 42;
     const availH = gridTop - gridBot;
     const rowStep = availH / R;
     const boxH = Math.min(15.2, rowStep - 3.0);
@@ -1647,6 +1665,8 @@ textarea, input[type=text], input[type=number] {
       }
     });
 
+    cmds.push(`0.35 0.35 0.35 rg BT /F1 8.5 Tf 36 24 Td (${pdfEscape(formatPrintStamp())}) Tj ET`);
+
     const stream = cmds.join('\n');
     const objs = [
       '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
@@ -1682,6 +1702,7 @@ textarea, input[type=text], input[type=number] {
     setTimeout(() => window.scrollTo(x, y), 200);
   }
   window.addEventListener('beforeprint', () => {
+    $('print-stamp').textContent = formatPrintStamp();
     if (!printScroll) printScroll = { x: window.scrollX, y: window.scrollY };
   });
   window.addEventListener('afterprint', restorePrintScroll);
@@ -1696,6 +1717,7 @@ textarea, input[type=text], input[type=number] {
   $('staff-minus').addEventListener('click', () => setStaffCount(workers() - 1));
   $('staff-plus').addEventListener('click', () => setStaffCount(workers() + 1));
   $('print').addEventListener('click', async () => {
+    $('print-stamp').textContent = formatPrintStamp();
     printScroll = { x: window.scrollX, y: window.scrollY };
     if (window.navigator.standalone) {
       try {
