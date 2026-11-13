@@ -8,8 +8,6 @@
   <title>Assign Beds</title>
   <meta name="apple-mobile-web-app-title" content="Assign Beds">
   <meta name="application-name" content="Assign Beds">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
@@ -1469,10 +1467,89 @@ textarea, input[type=text], input[type=number] {
     }
   });
 
+  function pdfEscape(str) {
+    return String(str).replace(/–/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+  }
+
+  function buildAssignmentsPdf() {
+    const rooms = buildRooms();
+    const allBeds = rooms.flatMap((r) => r.beds);
+    const bedOrder = allBeds.map((x) => x.id);
+    const { groups } = divideBeds(allBeds, workers(), extras());
+    const title = `${tab()} assignments, ${new Date().toLocaleDateString()}`;
+    const cmds = [];
+    let y = 748;
+    cmds.push(`BT /F2 15 Tf 36 ${y} Td (${pdfEscape(title)}) Tj ET`);
+    y -= 8;
+    cmds.push(`0 0 0 RG 1.2 w 36 ${y} m 576 ${y} l S`);
+    const rowH = Math.min(34, Math.max(18, Math.floor(680 / Math.max(1, groups.length))));
+    groups.forEach((g, i) => {
+      const name = staffName(i);
+      const occ = g.occupied;
+      const range = !occ.length ? 'No patients' : (occ[0] === occ[occ.length - 1] ? `Bed ${occ[0]}` : `Beds ${occ[0]} - ${occ[occ.length - 1]}`);
+      let skipped = '';
+      if (occ.length) {
+        const a = bedOrder.indexOf(occ[0]), b = bedOrder.indexOf(occ[occ.length - 1]);
+        const sk = bedOrder.slice(a, b + 1).filter((id) => !occ.includes(id));
+        if (sk.length) skipped = `Skip (empty): ${sk.join(', ')}`;
+      }
+      const countStr = `${occ.length} patient${occ.length === 1 ? '' : 's'}`;
+      const textY = y - (skipped ? Math.round(rowH * 0.45) : Math.round(rowH * 0.62));
+      cmds.push(`0 0 0 rg BT /F2 11 Tf 40 ${textY} Td (${pdfEscape(name)}) Tj ET`);
+      cmds.push(`0 0 0 rg BT /F2 11 Tf 190 ${textY} Td (${pdfEscape(range)}) Tj ET`);
+      const countX = 572 - countStr.length * 5.6;
+      cmds.push(`0 0 0 rg BT /F2 10.5 Tf ${countX.toFixed(1)} ${textY} Td (${pdfEscape(countStr)}) Tj ET`);
+      if (skipped) {
+        cmds.push(`0.25 0.25 0.25 rg BT /F1 8.5 Tf 190 ${textY - 11} Td (${pdfEscape(skipped)}) Tj ET`);
+      }
+      y -= rowH;
+      cmds.push(`0.75 0.75 0.75 RG 0.5 w 36 ${y} m 576 ${y} l S`);
+    });
+    const stream = cmds.join('\n');
+    const objs = [
+      '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+      '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n',
+      '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>\nendobj\n',
+      '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
+      '5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n',
+      `6 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}\nendstream\nendobj\n`,
+    ];
+    let pdf = '%PDF-1.4\n';
+    const offsets = [];
+    for (const o of objs) {
+      offsets.push(pdf.length);
+      pdf += o;
+    }
+    const xrefPos = pdf.length;
+    pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+    for (const off of offsets) {
+      pdf += String(off).padStart(10, '0') + ' 00000 n \n';
+    }
+    pdf += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF`;
+    return new Blob([pdf], { type: 'application/pdf' });
+  }
+
   countInput.addEventListener('change', () => setStaffCount(countInput.value));
   $('staff-minus').addEventListener('click', () => setStaffCount(workers() - 1));
   $('staff-plus').addEventListener('click', () => setStaffCount(workers() + 1));
-  $('print').addEventListener('click', () => window.print());
+  $('print').addEventListener('click', async () => {
+    if (window.navigator.standalone) {
+      try {
+        const blob = buildAssignmentsPdf();
+        const file = new File([blob], `${tab()}-assignments.pdf`, { type: 'application/pdf' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: `${tab()} assignments` });
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+      }
+    }
+    window.print();
+  });
   $('finalize').addEventListener('click', finalize);
   const tabs = [...document.querySelectorAll('.tabs [role=tab]')];
   tabs.forEach((t, i) => {

@@ -3,7 +3,7 @@
   "short_name": "Assign Beds",
   "description": "Split the occupied beds in a unit evenly among the staff on shift.",
   "start_url": "./",
-  "display": "standalone",
+  "display": "browser",
   "background_color": "#111418",
   "theme_color": "#111418",
   "icons": [
